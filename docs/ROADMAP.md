@@ -56,14 +56,14 @@ Roadmap ini tidak menyertakan estimasi durasi kalender (minggu/bulan). Tim devel
 **Deliverables:**
 
 - Chart of Accounts: CRUD dengan hierarki (`parent_id`), seed data struktur akun standar.
-- Journal Entry engine: `JournalEntryService` yang menegakkan balance check (total debit = total credit) sebelum commit.
-- UI melihat daftar journal entry dan detail per entry (read-only dulu, karena kebanyakan entry akan digenerate otomatis dari event module lain, bukan diinput manual).
-- Vendor master data dan Vendor Bill (AP minimal) sesuai DATABASE.md.
-- Event listener skeleton untuk `SalesOrderCompleted` dan `PayrollProcessed` (logic detail-nya baru lengkap saat M2/M3, tapi struktur listener dan queue job sudah disiapkan di sini).
+- Journal Entry engine: `JournalEntryService` yang menegakkan balance check (total debit = total credit) sebelum commit, generate `entry_number` human-readable otomatis, dan mendukung **void** (`voidEntry()`) dengan `void_reason` wajib diisi. Entry yang sudah `posted` immutable secara nilai, koreksi hanya lewat void, tidak pernah edit/delete langsung (lihat ARCHITECTURE.md Section 5b).
+- UI melihat daftar journal entry dan detail per entry (read-only untuk nilai, karena kebanyakan entry akan digenerate otomatis dari event module lain, bukan diinput manual), plus aksi void dari UI.
+- Vendor master data dan Vendor Bill (AP minimal) sesuai DATABASE.md. Vendor Bill men-generate journal entry otomatis secara accrual (saat bill dibuat, bukan saat dibayar), pelunasan lewat toggle status manual (tanpa payment detail tracking terpisah, beda sengaja dari AR).
+- Event Class `SalesOrderCompleted` dan `PayrollProcessed` didefinisikan di module producer (`SalesInventory`, `HR`), Listener skeleton (`CreateJournalEntryFromSalesOrder`, `CreateJournalEntryFromPayroll`) di module consumer (`Finance`), keduanya `ShouldQueue` (logic detail-nya baru lengkap saat M2/M3, tapi struktur listener dan queue job sudah disiapkan di sini). Konsekuensinya, skeleton folder `Events/` di `SalesInventory` dan `HR` dibuat lebih awal dari jadwal modulnya (lihat ARCHITECTURE.md Section 5).
 
-**Exit criteria:** Chart of Accounts bisa diisi dan dipakai, journal entry bisa dibuat manual lewat UI (untuk kasus non-otomatis) dengan balance check yang benar-benar menolak entry yang tidak balance.
+**Exit criteria:** Chart of Accounts bisa diisi dan dipakai, journal entry bisa dibuat manual lewat UI (untuk kasus non-otomatis) dengan balance check yang benar-benar menolak entry yang tidak balance, `entry_number` konsisten ter-generate, void journal entry berfungsi dan mewajibkan reason, vendor bill create dan pelunasan menghasilkan journal entry otomatis dengan angka yang benar.
 
-**Risk yang perlu dipantau:** struktur CoA final belum settled (lihat PRD Section 7). Ini blocker potensial untuk M1, sebaiknya dikonfirmasi paralel selama M0 berjalan supaya tidak jadi bottleneck saat M1 dimulai.
+**Risk yang perlu dipantau:** query laporan finansial di M4 (task 4.5, 4.6) wajib filter `WHERE status = 'posted'` pada `journal_entries`, kalau terlewat, entry yang di-void ikut terhitung dan laporan jadi salah tanpa tanda kesalahan yang jelas. Perlu diverifikasi eksplisit saat M4 dimulai, bukan diasumsikan otomatis benar.
 
 ## 5. M2 - Sales & Inventory
 

@@ -19,12 +19,7 @@ class IdentityServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
-
-        $this->loadViewsFrom(
-            __DIR__ . '/../resources/views',
-            'identity'
-        );
-
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'identity');
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
         Gate::policy(User::class, UserPolicy::class);

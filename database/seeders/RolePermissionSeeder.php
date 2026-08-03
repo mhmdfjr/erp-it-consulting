@@ -30,8 +30,15 @@ class RolePermissionSeeder extends Seeder
         'identity.role.delete',
         'identity.settings.manage',
 
-        // Finance - placeholder, di-refine saat M1.
-        'finance.manage',
+        'finance.coa.view',
+        'finance.journal.view',
+        'finance.journal.create',
+        'finance.journal.void',
+        'finance.vendor.view',
+        'finance.vendor.manage',
+        'finance.vendorbill.view',
+        'finance.vendorbill.create',
+        'finance.vendorbill.pay',
 
         // Sales & Inventory - placeholder, di-refine saat M2.
         'sales.manage',

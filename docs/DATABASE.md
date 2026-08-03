@@ -16,6 +16,7 @@ Dua open question dari PRD.md belum terjawab final. Schema di bawah dibuat denga
 - **ASUMSI 2 - Tabel TER**: **sudah tidak lagi asumsi**, data resmi TER Bulanan (kategori A/B/C) berdasarkan PMK 168/2023 sudah tersedia dan dimasukkan sebagai seed data di Appendix A. TER Harian untuk pegawai tidak tetap **resmi di luar scope MVP**, didefer ke fase 2 (lihat Section 2.9). Schema saat ini hanya mendukung employee dengan skema penggajian bulanan (TER Bulanan).
 - **ASUMSI 3 - Stock adjustment**: `stock_movements` mewajibkan `reason_code` untuk movement bertipe `adjustment`, supaya ada jejak kenapa stok berubah di luar transaksi sales. Kalau ternyata tidak perlu reason code wajib, tinggal ubah constraint `NOT NULL` jadi nullable, tidak perlu migrasi struktural.
 - **ASUMSI 4 - Chart of Accounts**: seed data awal sudah tersedia di Appendix C, diadaptasi dari referensi CoA perusahaan jasa dan disesuaikan untuk bisnis campuran jasa+barang teknologi. Ini bukan hasil audit akuntan, tetap perlu direview sebelum go-live produksi (lihat catatan di Appendix C).
+- **ASUMSI 5 - HPP/COGS timing**: **sudah diputuskan**, pakai metode **perpetual** (real-time per transaksi), bukan periodic. Setiap `SalesOrderCompleted` untuk item `physical_good` menghasilkan dua pasang jurnal sekaligus: pendapatan (debit Piutang, kredit Pendapatan) dan HPP (debit 501 HPP, kredit 105 Persediaan). Nilai HPP diambil dari `items.cost_price` **tunggal** (last-cost), bukan FIFO atau weighted average — kalau harga modal barang berubah antar batch pembelian, sistem tidak melacak cost per-lot, cuma pakai `cost_price` yang tersimpan di `items` saat transaksi terjadi. Ini simplifikasi sadar untuk MVP: cocok kalau harga modal barang relatif stabil, kurang akurat kalau modal sering fluktuatif (misal karena kurs). Kalau kebutuhan akurasi costing meningkat di fase 2, ini butuh tabel tambahan (`stock_lots` atau sejenis) untuk valuation method yang lebih tepat, bukan sekadar perubahan konfigurasi.
 
 ---
 
@@ -329,18 +330,22 @@ Index: `code` (unique), `parent_id`.
 
 ### 3.2 `journal_entries`
 
-| Column         | Type         | Constraint                 | Keterangan                                       |
-| -------------- | ------------ | -------------------------- | ------------------------------------------------ |
-| id             | bigserial    | PK                         |                                                  |
-| entry_date     | date         | NOT NULL                   |                                                  |
-| reference_type | varchar(255) | NULL                       | misal `SalesOrder`, `PayrollRun`                 |
-| reference_id   | bigint       | NULL                       |                                                  |
-| description    | text         | NULL                       |                                                  |
-| created_by     | bigint       | FK -> users.id, NULL       | null kalau digenerate otomatis dari domain event |
-| status         | varchar(20)  | NOT NULL, DEFAULT 'posted' | enum: posted, void                               |
-| created_at     | timestamptz  | NOT NULL                   |                                                  |
+| Column         | Type         | Constraint                         | Keterangan                                                                                                                                                              |
+| -------------- | ------------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id             | bigserial    | PK                                 |                                                                                                                                                                         |
+| entry_number   | varchar(30)  | UNIQUE, NOT NULL                   | human-readable reference, format `JE-{YYYY}-{6 digit sequential}` misal `JE-2026-000001`, digenerate di `JournalEntryService::createEntry()`, sequence reset tiap tahun |
+| entry_date     | date         | NOT NULL                           |                                                                                                                                                                         |
+| reference_type | varchar(255) | NULL                               | misal `SalesOrder`, `PayrollRun`                                                                                                                                        |
+| reference_id   | bigint       | NULL                               |                                                                                                                                                                         |
+| description    | text         | NULL                               |                                                                                                                                                                         |
+| created_by     | bigint       | FK -> users.id, NULL               | null kalau digenerate otomatis dari domain event                                                                                                                        |
+| status         | varchar(20)  | NOT NULL, DEFAULT 'posted'         | enum: posted, void                                                                                                                                                      |
+| void_reason    | text         | NULL, NOT NULL kalau status = void | alasan wajib diisi saat void, dicek di level aplikasi bukan DB constraint (butuh conditional logic, sama seperti `reason_code` di `stock_movements`)                    |
+| created_at     | timestamptz  | NOT NULL                           |                                                                                                                                                                         |
 
-Index: composite `(reference_type, reference_id)` untuk trace jurnal dari transaksi sumbernya.
+Index: composite `(reference_type, reference_id)` untuk trace jurnal dari transaksi sumbernya. Index unique `entry_number`.
+
+**Immutability setelah posted**: baris `journal_entries` yang sudah `posted` tidak pernah diubah nilai debit/credit-nya (dan baris `journal_entry_lines` terkait juga tidak). Void cuma flip `status` jadi `void` dan isi `void_reason`, tidak pernah hapus atau edit angka. Ini konsekuensi langsung dari prinsip "tidak ada delete untuk data finansial" (lihat Section 6). **Setiap query laporan finansial (laba rugi, neraca) wajib filter `WHERE status = 'posted'`**, kalau tidak, entry yang di-void tetap ikut terhitung dan laporan jadi salah — lihat catatan yang sama di ARCHITECTURE.md.
 
 ### 3.3 `journal_entry_lines`
 
@@ -374,17 +379,24 @@ Index: `journal_entry_id`, `account_id`.
 
 Representasi minimal AP tanpa Purchasing module formal (sesuai PRD, PO ke vendor didefer ke fase berikutnya).
 
-| Column      | Type          | Constraint                 | Keterangan               |
-| ----------- | ------------- | -------------------------- | ------------------------ |
-| id          | bigserial     | PK                         |                          |
-| vendor_id   | bigint        | FK -> vendors.id, NOT NULL |                          |
-| bill_number | varchar(100)  | NOT NULL                   |                          |
-| bill_date   | date          | NOT NULL                   |                          |
-| due_date    | date          | NOT NULL                   |                          |
-| amount      | numeric(15,2) | NOT NULL                   |                          |
-| status      | varchar(20)   | NOT NULL, DEFAULT 'unpaid' | enum: unpaid, paid, void |
-| created_at  | timestamptz   | NOT NULL                   |                          |
-| updated_at  | timestamptz   | NOT NULL                   |                          |
+| Column      | Type          | Constraint                           | Keterangan                                                                                                                                                          |
+| ----------- | ------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id          | bigserial     | PK                                   |                                                                                                                                                                     |
+| vendor_id   | bigint        | FK -> vendors.id, NOT NULL           |                                                                                                                                                                     |
+| account_id  | bigint        | FK -> chart_of_accounts.id, NOT NULL | akun yang di-debit saat bill dibuat (beban atau aset), harus `is_postable = true`, divalidasi di `VendorBillService` sama seperti validasi di `JournalEntryService` |
+| bill_number | varchar(100)  | NOT NULL                             |                                                                                                                                                                     |
+| bill_date   | date          | NOT NULL                             |                                                                                                                                                                     |
+| due_date    | date          | NOT NULL                             |                                                                                                                                                                     |
+| amount      | numeric(15,2) | NOT NULL                             |                                                                                                                                                                     |
+| status      | varchar(20)   | NOT NULL, DEFAULT 'unpaid'           | enum: unpaid, paid, void                                                                                                                                            |
+| created_at  | timestamptz   | NOT NULL                             |                                                                                                                                                                     |
+| updated_at  | timestamptz   | NOT NULL                             |                                                                                                                                                                     |
+
+**Keputusan integrasi ke Finance (M1)**:
+
+- **Jurnal dibuat otomatis saat bill dibuat** (accrual basis), bukan saat dibayar. Jurnal: debit `account_id` (dari bill), kredit 201 Utang Usaha, sebesar `amount`. Ini konsisten dengan Sales Order yang juga accrual di sisi piutang (piutang dicatat saat sales completed, bukan saat cash diterima).
+- Satu bill = satu akun (`account_id` tunggal). Kalau ada kebutuhan split satu bill ke beberapa akun beban, bill tersebut dipecah jadi beberapa bill terpisah, **bukan** ditambah tabel `vendor_bill_lines`. Ini keputusan sadar untuk menjaga schema tetap sederhana di MVP.
+- **Tidak ada tabel `vendor_bill_payments`**. Berbeda sengaja dari `invoices`/`payments` — pelunasan vendor bill cuma toggle `status` jadi `paid` secara manual lewat UI, tanpa payment detail (tanggal, metode, reference number) tersimpan terpisah. Alasan: risiko AP lebih rendah daripada AR untuk MVP ini (perusahaan sendiri yang mengontrol kapan dan berapa dibayar ke vendor, tidak butuh audit trail sedetail rekonsiliasi pembayaran customer). Saat status berubah jadi `paid`, generate jurnal kedua: debit 201 Utang Usaha, kredit 101/102 Kas/Bank. Kalau kebutuhan partial payment tracking untuk vendor muncul di fase berikutnya, ini upgrade schema terpisah (tambah tabel `vendor_bill_payments` mirror struktur `payments`).
 
 ### 3.6 `invoices`
 
@@ -838,11 +850,13 @@ Ini seed data awal yang wajar untuk mulai development, bukan hasil audit dari ak
 | 531  | Beban Bunga                                  | 530         | true        |
 | 532  | Beban Administrasi Bank                      | 530         | true        |
 
-**Catatan pemetaan ke transaksi otomatis** (dipakai saat menulis listener `CreateJournalEntryFromSalesOrder` dan `CreateJournalEntryFromPayroll` di M2/M3):
+**Catatan pemetaan ke transaksi otomatis** (dipakai saat menulis listener `CreateJournalEntryFromSalesOrder` dan `CreateJournalEntryFromPayroll` di M2/M3, dan `VendorBillService` di M1):
 
-- Sales Order completed (barang fisik): debit 103 (Piutang Usaha), kredit 402 (Pendapatan Penjualan Barang Teknologi), plus jurnal HPP debit 501 kredit 105 sebesar cost_price kalau mau mengakui HPP saat penjualan (opsional untuk MVP, bisa disederhanakan jadi periodic kalau tidak mau kompleksitas perpetual inventory costing di awal, ini keputusan yang perlu kamu ambil eksplisit saat implementasi M2).
-- Sales Order completed (jasa konsultasi): debit 103 (Piutang Usaha), kredit 401 (Pendapatan Jasa Konsultasi IT).
+- Sales Order completed (barang fisik): **wajib** dua pasang jurnal sekaligus (perpetual, lihat ASUMSI 5 di Section 0, sudah diputuskan bukan opsional lagi) — (1) debit 103 (Piutang Usaha), kredit 402 (Pendapatan Penjualan Barang Teknologi), (2) debit 501 (Harga Pokok Penjualan Barang), kredit 105 (Persediaan Barang Dagang) sebesar `cost_price` dikali quantity terjual.
+- Sales Order completed (jasa konsultasi): debit 103 (Piutang Usaha), kredit 401 (Pendapatan Jasa Konsultasi IT). Tidak ada jurnal HPP karena jasa tidak punya `cost_price`/persediaan.
 - Payroll processed: debit 511 (Beban Gaji), debit 512/513 (Beban BPJS Perusahaan), kredit 202 (Utang Gaji) atau langsung kredit 101/102 kalau net pay langsung dibayar, kredit 203 (Utang PPh21), kredit 204/205 (Utang BPJS).
+- Vendor bill dibuat (M1, accrual basis): debit `vendor_bills.account_id` (akun beban/aset sesuai bill), kredit 201 (Utang Usaha) sebesar `amount`.
+- Vendor bill dibayar (status → paid): debit 201 (Utang Usaha), kredit 101/102 (Kas/Bank) sebesar `amount`.
 
 ---
 

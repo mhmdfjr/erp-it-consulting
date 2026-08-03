@@ -100,38 +100,44 @@ Dua item sebelumnya ditandai **BLOCKER**, sekarang sudah terisi seed data-nya (l
 
 ### Struktur Module
 
-- [ ] 1.1 Buat struktur folder `app/Modules/Finance` sama seperti pattern Identity di M0 (Http/Controllers, Livewire, Models, Services, Events, Listeners, Providers, routes, database/migrations, resources/views).
-- [ ] 1.2 Buat `FinanceServiceProvider`, register, load routes/views/migrations dari module ini.
+- [x] 1.1 Buat struktur folder `app/Modules/Finance` sama seperti pattern Identity di M0 (Http/Controllers, Livewire, Models, Services, Events, Listeners, Providers, routes, database/migrations, resources/views).
+- [x] 1.2 Buat `FinanceServiceProvider`, register, load routes/views/migrations dari module ini.
+- [x] 1.2a Buat skeleton folder `Events/` (kosong dulu, isinya di task 1.14a) di `app/Modules/SalesInventory` dan `app/Modules/HR`, tanpa membuat isi module lainnya (Http/Controllers, Services, dst tetap dibangun sesuai jadwal M2/M3). Ini dibutuhkan lebih awal karena Event class hidup di module producer sesuai ARCHITECTURE.md Section 5, sementara Listener-nya (M1) butuh mengimpor Event class tersebut.
 
 ### Migration dan Model
 
-- [ ] 1.3 Migration `chart_of_accounts` sesuai DATABASE.md Section 3.1, termasuk `parent_id` self-referencing FK.
-- [ ] 1.4 Seeder `ChartOfAccountsSeeder`: masukkan seluruh data dari DATABASE.md Appendix C (kode, nama, account_type, parent_code, is_postable). Buat header/group dulu (is_postable=false), baru leaf account yang reference parent_id-nya.
-- [ ] 1.5 Migration `journal_entries` dan `journal_entry_lines` sesuai DATABASE.md Section 3.2-3.3.
-- [ ] 1.6 Migration `vendors` dan `vendor_bills` sesuai DATABASE.md Section 3.4-3.5.
-- [ ] 1.7 Model `ChartOfAccount` (dengan relasi `parent()`/`children()`), `JournalEntry`, `JournalEntryLine`, `Vendor`, `VendorBill`.
+- [x] 1.3 Migration `chart_of_accounts` sesuai DATABASE.md Section 3.1, termasuk `parent_id` self-referencing FK.
+- [x] 1.4 Seeder `ChartOfAccountsSeeder`: masukkan seluruh data dari DATABASE.md Appendix C (kode, nama, account_type, parent_code, is_postable). Buat header/group dulu (is_postable=false), baru leaf account yang reference parent_id-nya.
+- [x] 1.5 Migration `journal_entries` (termasuk kolom `entry_number` dan `void_reason`, lihat DATABASE.md Section 3.2) dan `journal_entry_lines` sesuai DATABASE.md Section 3.2-3.3.
+- [x] 1.6 Migration `vendors` dan `vendor_bills` (termasuk kolom `account_id`, lihat DATABASE.md Section 3.5) sesuai DATABASE.md Section 3.4-3.5.
+- [x] 1.7 Model `ChartOfAccount` (dengan relasi `parent()`/`children()`), `JournalEntry` (dengan relasi `lines()`), `JournalEntryLine`, `Vendor`, `VendorBill` (dengan relasi `account()`).
 
 ### Service Layer
 
-- [ ] 1.8 `JournalEntryService::createEntry(array $data)`: terima array lines (account_id, debit, credit), buka DB transaction, validasi `sum(debit) === sum(credit)` sebelum insert, validasi setiap `account_id` yang dipakai punya `is_postable = true` (tolak kalau ada line yang posting ke akun header/group), kalau tidak balance atau ada akun non-postable lempar custom exception (`UnbalancedJournalEntryException` / `NonPostableAccountException`), commit kalau valid.
-- [ ] 1.9 Unit test untuk `JournalEntryService`: test entry balance berhasil, test entry tidak balance ditolak dengan exception yang benar.
+- [x] 1.8 `JournalEntryService::createEntry(array $data)`: terima array lines (account_id, debit, credit), buka DB transaction, generate `entry_number` otomatis (format `JE-{YYYY}-{6 digit sequential}`, sequence reset tiap tahun), validasi `sum(debit) === sum(credit)` sebelum insert, validasi setiap `account_id` yang dipakai punya `is_postable = true` (tolak kalau ada line yang posting ke akun header/group), kalau tidak balance atau ada akun non-postable lempar custom exception (`UnbalancedJournalEntryException` / `NonPostableAccountException`), commit kalau valid.
+- [x] 1.8a `JournalEntryService::voidEntry(JournalEntry $entry, string $reason)`: validasi `$reason` tidak kosong (lempar exception kalau kosong), ubah `status` jadi `void`, isi `void_reason`. Tidak pernah mengubah nilai debit/credit atau menghapus baris `journal_entry_lines`, entry yang sudah void tetap immutable secara nilai (lihat ARCHITECTURE.md Section 5b).
+- [x] 1.9 Unit test untuk `JournalEntryService`: test entry balance berhasil (assert `entry_number` ter-generate dengan format benar), test entry tidak balance ditolak dengan exception yang benar, test posting ke akun non-postable ditolak, test void mengubah status tanpa mengubah nilai lines, test void tanpa reason ditolak.
+- [x] 1.9a `VendorBillService::createBill(array $data)`: buka DB transaction, buat record `vendor_bills`, panggil `JournalEntryService::createEntry()` untuk generate jurnal accrual (debit `account_id` dari input, kredit 201 Utang Usaha), commit.
+- [x] 1.9b `VendorBillService::markAsPaid(VendorBill $bill)`: ubah `status` jadi `paid`, panggil `JournalEntryService::createEntry()` untuk generate jurnal pelunasan (debit 201 Utang Usaha, kredit 101/102 Kas/Bank).
+- [x] 1.9c Unit test untuk `VendorBillService`: test createBill menghasilkan journal entry balance dengan akun yang benar, test markAsPaid menghasilkan journal entry pelunasan yang benar.
 
 ### UI
 
-- [ ] 1.10 `ChartOfAccountController` + view: list CoA dalam bentuk indented tree/list sesuai hierarki `parent_id`.
-- [ ] 1.11 `JournalEntryController` + view: list journal entry (read-only), detail per entry menampilkan semua line item.
-- [ ] 1.12 Form manual journal entry (Livewire component untuk dynamic line rows, tambah/hapus baris debit-credit sebelum submit).
-- [ ] 1.13 `VendorController` + `VendorBillController` + view: CRUD dasar.
+- [x] 1.10 `ChartOfAccountController` + view: list CoA dalam bentuk indented tree/list sesuai hierarki `parent_id`.
+- [x] 1.11 `JournalEntryController` + view: list journal entry (read-only, tampilkan `entry_number` dan `status`), detail per entry menampilkan semua line item.
+- [x] 1.11a Tombol "Void" di halaman detail journal entry (hanya untuk entry berstatus `posted`), modal konfirmasi dengan textarea `void_reason` wajib diisi sebelum submit, panggil `JournalEntryService::voidEntry()`. Badge status di list dan detail membedakan `posted`/`void` (lihat DESIGN.md Status Badge).
+- [x] 1.12 Form manual journal entry (Livewire component untuk dynamic line rows, tambah/hapus baris debit-credit sebelum submit).
+- [x] 1.13 `VendorController` CRUD dasar, `VendorBillController` create/list/detail dengan field `account_id` (dropdown akun `is_postable = true`) wajib diisi di form create, tombol "Mark as Paid" di halaman detail yang memanggil `VendorBillService::markAsPaid()`.
 
 ### Event Skeleton (Consumer Side)
 
-- [ ] 1.14 Definisikan Event class `SalesOrderCompleted` dan `PayrollProcessed` (bisa ditaruh sementara di `app/Modules/Finance/Events` atau di module masing-masing sesuai keputusan final struktur, konsisten dengan ARCHITECTURE.md Section 5).
-- [ ] 1.15 Buat Listener `CreateJournalEntryFromSalesOrder` dan `CreateJournalEntryFromPayroll`, keduanya `implements ShouldQueue` sesuai ARCHITECTURE.md Section 5. Isi `handle()` masih kosong/placeholder (`// TODO: implemented in M2/M3`), yang penting struktur dan registrasi listener-nya sudah jalan.
-- [ ] 1.16 Register listener di `EventServiceProvider` atau lewat `Event::listen()` di `FinanceServiceProvider::boot()`.
+- [x] 1.14a Definisikan Event class `SalesOrderCompleted` di `app/Modules/SalesInventory/Events/SalesOrderCompleted.php` dan `PayrollProcessed` di `app/Modules/HR/Events/PayrollProcessed.php` (Event hidup di module producer, sesuai ARCHITECTURE.md Section 5, folder skeleton sudah dibuat di task 1.2a).
+- [x] 1.15 Buat Listener `CreateJournalEntryFromSalesOrder` dan `CreateJournalEntryFromPayroll` di `app/Modules/Finance/Listeners`, keduanya `implements ShouldQueue` sesuai ARCHITECTURE.md Section 5. Isi `handle()` masih kosong/placeholder (`// TODO: implemented in M2/M3`), yang penting struktur dan registrasi listener-nya sudah jalan.
+- [x] 1.16 Register listener di `EventServiceProvider` atau lewat `Event::listen()` di `FinanceServiceProvider::boot()`.
 
 ### Review Exit Criteria M1
 
-- [ ] 1.17 Verifikasi terhadap ROADMAP.md M1: CoA terisi dan bisa dipakai, journal entry manual bisa dibuat dengan balance check yang benar-benar menolak entry tidak seimbang.
+- [x] 1.17 Verifikasi terhadap ROADMAP.md M1: CoA terisi dan bisa dipakai, journal entry manual bisa dibuat dengan balance check yang benar-benar menolak entry tidak seimbang, `entry_number` ter-generate konsisten, void journal entry berfungsi dan mewajibkan reason, vendor bill create/pelunasan menghasilkan journal entry otomatis dengan angka yang benar.
 
 ---
 

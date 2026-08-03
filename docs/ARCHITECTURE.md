@@ -130,6 +130,12 @@ Tabel ini didefinisikan sebagai kontrak antar module. Setiap event baru yang men
 
 Listener yang menangani efek finansial (`SalesOrderCompleted`, `PayrollProcessed`) sebaiknya di-queue (`ShouldQueue`), bukan synchronous, supaya kegagalan proses finansial tidak membuat request asal (misalnya klik "Complete Order") jadi lambat atau gagal total kalau ada masalah sementara di Finance module. Trade-off: butuh queue worker jalan (`php artisan queue:work` via Supervisor di production), dan perlu strategi retry serta dead-letter handling kalau listener gagal berkali-kali, supaya journal entry yang gagal dibuat tidak hilang diam-diam.
 
+**Konvensi lokasi Event dan Listener (keputusan final)**: Event class hidup di module **producer** (contoh: `SalesInventory/Events/SalesOrderCompleted.php`, `HR/Events/PayrollProcessed.php`), Listener hidup di module **consumer** (contoh: `Finance/Listeners/CreateJournalEntryFromSalesOrder.php`). Event adalah kontrak yang dimiliki module yang men-trigger-nya, module lain yang mau bereaksi cukup import class Event tersebut dan daftarkan listener-nya sendiri.
+
+Trade-off yang disadari: pendekatan alternatif adalah menaruh Event class di folder netral (`app/Shared/Events/`) supaya module consumer tidak perlu import namespace module lain sama sekali, menghindari coupling kalau salah satu module suatu saat di-extract jadi service terpisah. Untuk skala proyek ini (solo developer, tidak ada rencana extract-to-microservice), producer-owned Event lebih konvensional dan predictable, risiko cross-namespace import diterima sebagai trade-off yang wajar.
+
+**Konsekuensi urutan build**: karena M1 (Finance) menulis Listener yang meng-import Event class dari `SalesInventory` dan `HR`, kedua module tersebut butuh skeleton folder `Events/` dibuat lebih awal dari jadwalnya (M2/M3), meski isi module lainnya (`Http/Controllers`, `Services`, dst) tetap dibangun sesuai urutan ROADMAP.md.
+
 ## 5a. Audit Logging: Trait vs Domain Event
 
 Ada dua mekanisme audit yang disengaja berbeda, bukan inkonsistensi:
@@ -138,6 +144,14 @@ Ada dua mekanisme audit yang disengaja berbeda, bukan inkonsistensi:
 - **Domain event** (misal `StockAdjusted`): dipakai kalau butuh payload custom yang tidak tertangkap dari `getDirty()`/`getOriginal()` biasa (misal `reason_code` dari request context).
 
 **Keterbatasan trait `Auditable`**: hanya bisa dipasang ke Model milik aplikasi sendiri. Model dari package eksternal (`Spatie\Permission\Models\Role`, `Permission`) tidak teraudit lewat mekanisme ini karena tidak bisa ditambah trait tanpa custom extend class. Perubahan Role/Permission assignment saat ini **tidak tercatat** di `audit_logs`. Ini keputusan sadar untuk scope M0 (lihat PRD.md Section 4.1, entity kritikal yang disebut eksplisit tidak termasuk role/permission), bukan oversight. Kalau kebutuhan compliance audit role berubah, opsi: override `config/permission.php` untuk pakai custom Model class yang extends `Spatie\Permission\Models\Role` dan pasang trait `Auditable`.
+
+## 5b. Journal Entry Immutability dan Void
+
+`journal_entries` yang sudah berstatus `posted` tidak pernah diubah nilai debit/credit-nya, baik lewat manual entry maupun yang digenerate otomatis dari domain event. Koreksi kesalahan dilakukan lewat **void**, bukan edit atau delete: `JournalEntryService::voidEntry()` mengubah `status` jadi `void` dan mewajibkan `void_reason` diisi, baris `journal_entry_lines` terkait tetap utuh sebagai jejak audit. Ini konsisten dengan DATABASE.md Section 6 yang sudah menetapkan tabel transaksional tidak pakai soft delete/hard delete, hanya bisa di-void lewat kolom `status`.
+
+Void functionality masuk scope M1 (bukan didefer ke M4), karena tanpa mekanisme koreksi resmi, satu-satunya cara memperbaiki entry yang salah adalah query manual ke database, yang bertentangan langsung dengan Auditability sebagai Non-Functional Requirement utama (PRD.md Section 5).
+
+**Konsekuensi wajib untuk module lain**: setiap query laporan finansial (laba rugi, neraca, task 4.5-4.6 di TASKS.md) harus filter `WHERE status = 'posted'` pada `journal_entries`. Kalau filter ini terlewat, entry yang sudah di-void tetap ikut terhitung dan laporan finansial jadi salah tanpa ada tanda kesalahan yang jelas di level query.
 
 ## 6. Livewire untuk Interaktivitas
 

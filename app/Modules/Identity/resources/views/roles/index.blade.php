@@ -1,12 +1,12 @@
 <x-app-layout>
-    <x-slot name="header">Role & Permission</x-slot>
-
-    <div class="flex justify-between items-center mb-4">
-        <h1 class="text-heading font-medium">Role & Permission</h1>
-        @can('create', \Spatie\Permission\Models\Role::class)
-            <x-button href="{{ route('identity.roles.create') }}" variant="primary">+ Tambah Role</x-button>
-        @endcan
-    </div>
+    <x-slot name="header">
+        <div class="flex items-center justify-between">
+            <h1 class="text-heading font-medium text-ink-black">Role & Permission</h1>
+            @can('create', \Spatie\Permission\Models\Role::class)
+                <x-button href="{{ route('identity.roles.create') }}" variant="primary">+ Tambah Role</x-button>
+            @endcan
+        </div>
+    </x-slot>
 
     @if (session('success'))
         <div class="mb-4 rounded-input bg-success-bg text-success px-4 py-2 text-body-sm">{{ session('success') }}</div>

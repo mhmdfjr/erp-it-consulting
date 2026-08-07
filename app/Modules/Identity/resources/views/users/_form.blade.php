@@ -34,7 +34,7 @@
     </div>
 
     <div class="flex justify-end gap-2">
-        <x-button variant="secondary" href="{{ route('identity.users.index') }}">Batal</x-button>
+        <x-button variant="danger" href="{{ route('identity.users.index') }}">Batal</x-button>
         <x-button variant="primary" type="submit">{{ $isEdit ? 'Simpan' : 'Buat Pengguna' }}</x-button>
     </div>
 </form>

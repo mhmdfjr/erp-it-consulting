@@ -44,7 +44,9 @@
                             <input type="number" step="0.01" min="0" wire:model.live.debounce.300ms="lines.{{ $key }}.credit" class="w-full text-right tabular-nums rounded-input border border-border-gray px-2 py-1.5">
                         </td>
                         <td class="px-4 py-3 text-center">
-                            <button type="button" wire:click="removeLine({{ $key }})" class="text-danger text-body-sm">Hapus</button>
+                            <button type="button" wire:click="removeLine({{ $key }})" class="text-danger">
+                                <x-lucide-trash-2 class="w-4 h-4" />
+                            </button>
                         </td>
                     </tr>
                 @endforeach
@@ -65,7 +67,7 @@
             <button type="button" wire:click="addLine" class="text-body-sm text-info">+ Tambah Baris</button>
 
             <div class="flex gap-3">
-                <x-button variant="secondary" href="{{ route('finance.journal-entries.index') }}">Batal</x-button>
+                <x-button variant="danger" href="{{ route('finance.journal-entries.index') }}">Batal</x-button>
                 <x-button variant="primary" wire:click="save" wire:loading.attr="disabled">Simpan Journal Entry</x-button>
             </div>
         </div>

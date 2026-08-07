@@ -4,6 +4,7 @@ use App\Modules\Finance\Http\Controllers\ChartOfAccountController;
 use App\Modules\Finance\Http\Controllers\JournalEntryController;
 use App\Modules\Finance\Http\Controllers\VendorBillController;
 use App\Modules\Finance\Http\Controllers\VendorController;
+use App\Modules\Finance\Http\Controllers\InvoiceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'auth'])->prefix('finance')->name('finance.')->group(function () {
@@ -21,4 +22,8 @@ Route::middleware(['web', 'auth'])->prefix('finance')->name('finance.')->group(f
     Route::post('vendor-bills', [VendorBillController::class, 'store'])->name('vendor-bills.store');
     Route::get('vendor-bills/{vendorBill}', [VendorBillController::class, 'show'])->name('vendor-bills.show');
     Route::post('vendor-bills/{vendorBill}/mark-as-paid', [VendorBillController::class, 'markAsPaid'])->name('vendor-bills.mark-as-paid');
+
+    Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+    Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+    Route::post('invoices/{invoice}/payments', [InvoiceController::class, 'storePayment'])->name('invoices.payments.store');
 });

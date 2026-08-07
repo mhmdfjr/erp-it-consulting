@@ -1,13 +1,28 @@
 @php
-    $navGroups = [
+   $navGroups = [
         'Utama' => [
             ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'layout-dashboard'],
         ],
+
         'Super Admin' => [
-            ['label' => 'Pengguna', 'route' => 'identity.users.index', 'icon' => 'users'],
+            ['label' => 'User', 'route' => 'identity.users.index', 'icon' => 'users'],
             ['label' => 'Role & Permission', 'route' => 'identity.roles.index', 'icon' => 'shield-check'],
             ['label' => 'Profil Perusahaan', 'route' => 'identity.company-profile.edit', 'icon' => 'building-2'],
             ['label' => 'Pengaturan Sistem', 'route' => 'identity.settings.index', 'icon' => 'settings'],
+        ],
+
+        'Finance' => [
+            ['label' => 'CoA', 'route' => 'finance.coa.index', 'icon' => 'landmark'],
+            ['label' => 'Entri Jurnal', 'route' => 'finance.journal-entries.index', 'icon' => 'book-open-text'],
+            ['label' => 'Vendor', 'route' => 'finance.vendors.index', 'icon' => 'truck'],
+            ['label' => 'Tagihan Vendor', 'route' => 'finance.vendor-bills.index', 'icon' => 'receipt'],
+            ['label' => 'Invoice', 'route' => 'finance.invoices.index', 'icon' => 'file-text'],
+        ],
+
+        'Sales' => [
+            ['label' => 'Barang dan Jasa', 'route' => 'sales.items.index', 'icon' => 'package'],
+            ['label' => 'Pelanggan', 'route' => 'sales.customers.index', 'icon' => 'contact-round'],
+            ['label' => 'Pesanan Penjualan', 'route' => 'sales.orders.index', 'icon' => 'shopping-cart'],
         ],
     ];
 @endphp

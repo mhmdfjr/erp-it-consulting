@@ -12,13 +12,8 @@ class RolePermissionSeeder extends Seeder
 {
     /**
      * Daftar permission dasar per module.
-     *
-     * Granularity sengaja kasar untuk module yang belum dibangun (Finance, SalesInventory, HR),
-     * cuma permission 'manage' level tinggi. Akan di-refine jadi lebih granular
-     * (create/view/update/delete per resource) begitu module tersebut benar-benar dibangun.
      */
     protected array $permissions = [
-        // Identity - sudah dibangun di M0, granularity lebih detail.
         'identity.manage',
         'identity.user.view',
         'identity.user.create',
@@ -30,6 +25,7 @@ class RolePermissionSeeder extends Seeder
         'identity.role.delete',
         'identity.settings.manage',
 
+        'finance.manage',
         'finance.coa.view',
         'finance.journal.view',
         'finance.journal.create',
@@ -39,9 +35,23 @@ class RolePermissionSeeder extends Seeder
         'finance.vendorbill.view',
         'finance.vendorbill.create',
         'finance.vendorbill.pay',
+        'finance.invoice.view',
+        'finance.invoice.pay',
 
-        // Sales & Inventory - placeholder, di-refine saat M2.
         'sales.manage',
+        'sales.item.view',
+        'sales.item.create',
+        'sales.item.update',
+        'sales.customer.view',
+        'sales.customer.create',
+        'sales.customer.update',
+        'sales.order.view',
+        'sales.order.create',
+        'sales.order.complete',
+        'sales.order.cancel',
+        'sales.inventory.view',
+        'sales.inventory.adjust',
+        'sales.category.create',
 
         // HR & Payroll - placeholder, di-refine saat M3.
         'hr.manage',

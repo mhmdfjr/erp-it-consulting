@@ -37,7 +37,7 @@
     </div>
 
     <div class="flex justify-end gap-2">
-        <x-button variant="secondary" href="{{ route('identity.roles.index') }}">Batal</x-button>
+        <x-button variant="danger" href="{{ route('identity.roles.index') }}">Batal</x-button>
         @unless ($isSuperAdmin)
             <x-button variant="primary" type="submit">{{ $isEdit ? 'Simpan' : 'Buat Role' }}</x-button>
         @endunless

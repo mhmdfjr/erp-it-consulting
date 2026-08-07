@@ -3,7 +3,7 @@
 ## Sistem ERP - Perusahaan IT Service & Consulting
 
 Status: Draft v1.0
-Terakhir diperbarui: 2026-07-30
+Terakhir diperbarui: 2026-08-03 (revisi M2)
 
 ---
 
@@ -143,52 +143,97 @@ Dua item sebelumnya ditandai **BLOCKER**, sekarang sudah terisi seed data-nya (l
 
 ## M2 - Sales & Inventory
 
+**Catatan keputusan yang diambil sebelum mulai coding M2** (lihat riwayat chat sebelumnya untuk reasoning lengkap):
+
+- Migration dan Model `Invoice`/`Payment` ada di module **Finance**, bukan SalesInventory, meski dipicu dari flow Sales.
+- `Invoice` digenerate **sync** di `SalesOrderService::completeOrder()`, bukan di listener queued. Listener `CreateJournalEntryFromSalesOrder` cuma bikin `journal_entries`, tidak lagi bikin invoice.
+- Journal entry dari Sales Order harus menangani order campuran barang+jasa lewat grouping per `item_type`, bukan asumsi satu order satu jenis item.
+- Cancel Order ditambahkan sebagai fitur baru: valid dari status `draft`, melepas stock reservation, reason wajib. (**Revisi setelah task 2.15-2.20**: enum `confirmed` dihapus dari `sales_orders.status` — tidak ada kode manapun yang pernah men-set order ke status itu, jadi cancel eligibility disederhanakan jadi cuma `draft`.)
+- **Gap ditemukan & ditambal saat task 2.21-2.23**: task 2.23 (dan DATABASE.md Section 3.7/Appendix C) tidak pernah eksplisit sebut jurnal apapun untuk pelunasan invoice AR — berbeda dari `VendorBillService` (AP, M1) yang eksplisit generate jurnal saat vendor bill dibayar. Tanpa jurnal pelunasan AR, akun 103 (Piutang Usaha) tidak akan pernah berkurang di buku besar meski invoice sudah `paid` secara status, melanggar prinsip double-entry dan bikin neraca tidak balance secara riil. Fix: `InvoiceController::storePayment()` generate journal entry **per payment** (bukan cuma saat full paid) — debit 101/102 (Kas/Bank, dipilih dari `payment_method`), kredit 103 (Piutang Usaha) sebesar `payment.amount`. **Asumsi belum dikonfirmasi**: pemilihan akun 101 (Kas) vs 102 (Bank) berdasarkan `payment_method === 'cash'`, sekelas dengan asumsi `due_date` net-30 di task 2.14 — perlu direview kalau perusahaan punya konvensi pencatatan kas/bank yang berbeda. Validasi tambahan: `amount` payment tidak boleh melebihi sisa tagihan (`invoice.amount - sum(payments.amount)`), mencegah overpayment.
+- **Gotcha operasional ditemukan saat verifikasi manual task 2.21**: listener `CreateJournalEntryFromSalesOrder` adalah `ShouldQueue` (ARCHITECTURE.md Section 5), jadi journal entry dari Sales Order **tidak muncul otomatis** setelah "Complete Order" kalau `php artisan queue:work` tidak sedang jalan — job cuma nongkrong di tabel `jobs` sampai ada worker yang proses. Ini bukan bug, tapi konsekuensi arsitektur yang harus diingat setiap kali verifikasi manual fitur yang melibatkan listener queued (sama berlaku untuk M3 nanti, `CreateJournalEntryFromPayroll`). **Wajib jalankan `php artisan queue:work` (atau `--once` untuk verifikasi sekali pakai) di terminal terpisah selama development/testing manual**, konsisten dengan `QUEUE_CONNECTION=database` yang sudah dikonfirmasi jalan sejak M0 (SESSION_SUMMARY_M0.md). Payment journal entry (task 2.23) sengaja dibuat **sync** langsung di controller, bukan lewat event/listener, jadi tidak kena masalah yang sama.
+- **Bug nyata ditemukan lewat test 2.24, bukan verifikasi manual**: `SalesOrderService::completeOrder()` awalnya panggil `InventoryService::decreaseStock()` untuk realisasi stok keluar, tapi method itu cuma mengurangi `quantity_on_hand`, sama sekali tidak menyentuh `quantity_reserved` yang sudah dibuat sejak `createOrder()` (task 2.13). Akibatnya `quantity_reserved` nyangkut permanen setiap kali order completed, `available_stock` (on_hand - reserved) makin lama makin salah. Fix: `InventoryService::fulfillReservedStock(Item $item, float $qty, array $referenceData)` — method baru yang mengurangi `quantity_on_hand` **dan** `quantity_reserved` sekaligus dalam satu transaction atomik (beda dari `releaseReservedStock()` yang dipakai `cancelOrder()`: reservasi di situ dilepas kembali ke pool tanpa stok fisik berkurang, sedangkan di `completeOrder()` reservasi itu **dikonsumsi**). `completeOrder()` diupdate memanggil `fulfillReservedStock()`, bukan `decreaseStock()`. Test regresi ditambahkan di `InventoryServiceTest::test_fulfill_reserved_stock_mengurangi_on_hand_dan_reserved_sekaligus`.
+
+**Permission granular SalesInventory yang sudah ter-assign ke Super Admin** (pola sama seperti daftar Finance di SESSION_SUMMARY_M1.md, dikumpulkan di sini sebagai referensi untuk task 2.26 dan starting context M3 nanti):
+
+```
+sales.item.view
+sales.item.create
+sales.item.update
+sales.category.manage
+sales.customer.view
+sales.customer.create
+sales.customer.update
+sales.order.view
+sales.order.create
+sales.order.complete
+sales.order.cancel
+sales.inventory.view
+sales.inventory.adjust
+```
+
+- **Catatan proses (task 2.15-2.20)**: draf awal view sempat salah asumsi API `<x-data-table>` (pakai `<x-slot name="head">` dengan `<th>` manual), padahal komponen aktual M0 pakai prop `:headers` (array) dan `:empty` (boolean) plus named slot `emptyState`/`pagination`. Sebelum menulis view baru yang pakai component shared M0 (`x-button`, `x-input`, `x-badge`, `x-data-table`, dst) di module M3/M4 nanti, **cek dulu isi file component aslinya** di `resources/views/components/`, jangan asumsikan API dari nama komponen atau pola generik Blade.
+- **Bug ditemukan & diperbaiki saat verifikasi manual UI (setelah 2.15-2.20 "selesai")**:
+    1. `UpdateItemRequest` sempat pakai rule `unique:items,sku,{id}` sebagai notasi placeholder yang salah ditulis literal — Laravel kirim string `"{id}"` apa adanya ke query SQL, error `invalid input syntax for type bigint`. Fix: `Rule::unique('items', 'sku')->ignore($this->route('item')->id)`.
+    2. `StoreCustomerRequest`/`UpdateCustomerRequest` sudah benar validasi `in:individual,corporate`, tapi view create/edit customer pakai `value="company"` di option select — mismatch enum menyebabkan submit "Perusahaan" selalu gagal validasi silent (tidak ada `@error` ditampilkan, select re-render tanpa `old()` sehingga terlihat seperti "fallback ke individu" padahal sebenarnya validation error yang tidak kelihatan). Fix: samakan value jadi `corporate`, tambahkan `@error('customer_type')`, inisialisasi `x-data` Alpine dari `old()`/nilai existing bukan hardcode.
+    3. Livewire `CreateOrder::itemSelected()` sempat ketinggalan `dd($this->items)` debug statement — setiap pilih item di dropdown request Livewire mati total. Dihapus.
+    4. `CreateOrder::save()` sempat panggil `Item::findOrFail()` sebelum `$this->validate()` — item_id invalid/kosong throw 404 mentah alih-alih pesan validasi. Urutan dibalik: validasi dulu, baru resolve item.
+    5. Ditambahkan (di luar scope task awal, permintaan tambahan): filter dropdown item di `CreateOrder` cuma tampilkan `service` atau `physical_good` dengan available stock (`quantity_on_hand > quantity_reserved`) > 0, plus cap quantity input server-side lewat hook `updated()` (HTML `max` attribute cuma UI hint, bukan enforcement saat submit via Livewire AJAX). Kolom "Stok Tersedia" ditambah eksplisit di tabel, bukan caption di bawah input.
+    6. `resources/views/orders/livewire/create-order.blade.php` dan `resources/views/chart-of-accounts/index.blade.php` (M1, ikut dirapikan) direfactor pakai `<x-data-table>` untuk konsistensi lintas module, sebelumnya tabel manual.
+- `order_number` dan `invoice_number` pakai format `{PREFIX}-{YYYY}-{6 digit sequential}`, konsisten dengan `entry_number` M1, lewat trait shared.
+
 ### Struktur Module
 
-- [ ] 2.1 Buat struktur folder `app/Modules/SalesInventory` (catatan: satu module folder, tapi dua service class terpisah sesuai keputusan di ARCHITECTURE.md Section 2 dan percakapan sebelumnya).
-- [ ] 2.2 Buat `SalesInventoryServiceProvider`, register, load routes/views/migrations.
+- [x] 2.1 Buat struktur folder `app/Modules/SalesInventory` (catatan: satu module folder, tapi dua service class terpisah sesuai keputusan di ARCHITECTURE.md Section 2 dan percakapan sebelumnya).
+- [x] 2.1a Extract trait `app/Shared/Support/GeneratesSequentialNumber.php` (lihat ARCHITECTURE.md Section 4a): terima prefix, tabel/kolom target, dan tahun eksplisit dari caller (bukan `now()->year`, mengikuti behavior asli `entry_date`-based di M1), cari nomor terakhir tahun yang sama, increment, format `{PREFIX}-{YYYY}-{6 digit sequential}`. Refactor `JournalEntryService::createEntry()` (M1) untuk pakai trait ini menggantikan logic inline generate `entry_number`, **tanpa mengubah format output**. **Jalankan ulang seluruh test M1 (`JournalEntryServiceTest`, `VendorBillServiceTest`, `EventListenerRegistrationTest`) dan pastikan tetap pass sebelum lanjut ke task berikutnya** — refactor ini menyentuh kode production-tested, regresi harus ketahuan di sini, bukan tercampur dengan perubahan M2 lain. **Terverifikasi: 10/10 test pass tanpa modifikasi assertion.**
+- [x] 2.2 Buat `SalesInventoryServiceProvider`, register, load routes/views/migrations.
 
 ### Migration dan Model
 
-- [ ] 2.3 Migration `item_categories`, `items` sesuai DATABASE.md Section 4.2-4.3.
-- [ ] 2.4 Migration `stock_levels`, `stock_movements` sesuai DATABASE.md Section 4.4-4.5.
-- [ ] 2.5 Migration `customers` sesuai DATABASE.md Section 4.1.
-- [ ] 2.6 Migration `sales_orders`, `sales_order_items` sesuai DATABASE.md Section 4.6-4.7.
-- [ ] 2.7 Migration `invoices`, `payments` sesuai DATABASE.md Section 3.6-3.7 (catatan: tabel ini didefinisikan di dokumen Finance karena secara data itu bagian dari Finance, tapi migration-nya bisa ditempatkan di module Finance meski dipicu dari flow Sales, sesuaikan lokasi migration dengan keputusan final kamu soal pemilik tabel).
-- [ ] 2.8 Model untuk seluruh tabel di atas dengan relasi Eloquent yang sesuai (`Item::stockLevel()`, `SalesOrder::items()`, `SalesOrder::invoice()`, dst).
+- [x] 2.3 Migration `item_categories`, `items` sesuai DATABASE.md Section 4.2-4.3.
+- [x] 2.4 Migration `stock_levels`, `stock_movements` sesuai DATABASE.md Section 4.4-4.5.
+- [x] 2.5 Migration `customers` sesuai DATABASE.md Section 4.1.
+- [x] 2.6 Migration `sales_orders` (termasuk kolom `cancel_reason`, lihat DATABASE.md Section 4.6), `sales_order_items` sesuai DATABASE.md Section 4.6-4.7.
+- [x] 2.7 Migration `invoices`, `payments` sesuai DATABASE.md Section 3.6-3.7, ditempatkan di `app/Modules/Finance/database/migrations` (**keputusan final**: kedua tabel ini milik module Finance, bukan SalesInventory, lihat DATABASE.md ASUMSI 6). Migration file `invoices` **wajib** punya timestamp setelah migration `sales_orders` (task 2.6), supaya FK constraint `sales_order_id` tidak gagal saat `php artisan migrate` — urutan eksekusi migration Laravel mengikuti timestamp filename, bukan urutan `loadMigrationsFrom()` di ServiceProvider mana pun.
+- [x] 2.8 Model untuk seluruh tabel di atas dengan relasi Eloquent yang sesuai (`Item::stockLevel()`, `SalesOrder::items()`, `SalesOrder::invoice()`, dst). Model `Invoice`/`Payment` ditaruh di `app/Modules/Finance/Models`, bukan `SalesInventory/Models`.
 
 ### Service Layer
 
-- [ ] 2.9 `InventoryService::increaseStock(Item $item, float $qty, array $referenceData)`.
-- [ ] 2.10 `InventoryService::decreaseStock(Item $item, float $qty, array $referenceData)`, tolak kalau `quantity_on_hand` tidak cukup.
-- [ ] 2.11 `InventoryService::reserveStock(Item $item, float $qty)` untuk sales order yang belum completed.
-- [ ] 2.12 `InventoryService::recordAdjustment(Item $item, float $qty, string $direction, string $reasonCode, ?string $note)`, wajibkan `$reasonCode` tidak kosong sesuai DATABASE.md Assumption 3.
-- [ ] 2.13 `SalesOrderService::createOrder(array $data)`: buat `sales_orders` + `sales_order_items` dalam satu DB transaction, panggil `InventoryService::reserveStock()` untuk tiap item `physical_good`.
-- [ ] 2.14 `SalesOrderService::completeOrder(SalesOrder $order)`: ubah status jadi `completed`, panggil `InventoryService::decreaseStock()` untuk realisasi stok keluar, fire event `SalesOrderCompleted`.
+- [x] 2.9 `InventoryService::increaseStock(Item $item, float $qty, array $referenceData)`.
+- [x] 2.10 `InventoryService::decreaseStock(Item $item, float $qty, array $referenceData)`, tolak kalau `quantity_on_hand` tidak cukup.
+- [x] 2.11 `InventoryService::reserveStock(Item $item, float $qty)` untuk sales order yang belum completed.
+- [x] 2.11a `InventoryService::releaseReservedStock(Item $item, float $qty)`: kurangi `quantity_reserved` di `stock_levels`. **Tidak** insert row baru ke `stock_movements` (bukan physical movement, lihat DATABASE.md Section 4.5). Dipakai oleh `SalesOrderService::cancelOrder()` (task 2.13a).
+- [x] 2.12 `InventoryService::recordAdjustment(Item $item, float $qty, string $direction, string $reasonCode, ?string $note)`, wajibkan `$reasonCode` tidak kosong sesuai DATABASE.md Assumption 3.
+- [x] 2.13 `SalesOrderService::createOrder(array $data)`: buat `sales_orders` + `sales_order_items` dalam satu DB transaction, generate `order_number` lewat trait `GeneratesSequentialNumber` (format `SO-{YYYY}-{6 digit}`), panggil `InventoryService::reserveStock()` untuk tiap item `physical_good`.
+- [x] 2.13a `SalesOrderService::cancelOrder(SalesOrder $order, string $reason)`: validasi status order saat ini `draft` (tolak dengan exception kalau sudah `completed`/`cancelled`), validasi `$reason` tidak kosong, panggil `InventoryService::releaseReservedStock()` untuk tiap item `physical_good` di order, ubah `status` jadi `cancelled` dan isi `cancel_reason`, dalam satu DB transaction.
+- [x] 2.14 `SalesOrderService::completeOrder(SalesOrder $order)`: dalam satu DB transaction — ubah status jadi `completed`, panggil `InventoryService::decreaseStock()` untuk realisasi stok keluar tiap item `physical_good`, **generate record `Invoice`** (nomor lewat trait `GeneratesSequentialNumber` format `INV-{YYYY}-{6 digit}`, `invoice_date`, `due_date`, `amount` dari `total_amount` order), commit. Setelah commit, fire event `SalesOrderCompleted` dengan payload `sales_order_id` **dan** `invoice_id` (bukan cuma `sales_order_id` seperti draft awal skeleton M1). **Catatan asumsi belum dikonfirmasi**: `due_date` invoice memakai default net-30 (`invoice_date + 30 hari`) karena DATABASE.md tidak menetapkan term pembayaran eksplisit — perlu dikonfirmasi/disesuaikan sebelum go-live kalau perusahaan punya term standar berbeda.
+- [x] 2.14a Unit test `SalesOrderService`: test `cancelOrder` melepas reservasi dengan benar dan menolak kalau status sudah `completed`, test `cancelOrder` menolak kalau `reason` kosong, test `completeOrder` menghasilkan `Invoice` dengan `invoice_number` format benar dan `amount` sesuai `total_amount` order. **Terverifikasi: 4/4 test pass.** Ditemukan gotcha baru saat menulis test ini: Model di `app/Modules/{Module}/Models` butuh override `newFactory()` eksplisit DAN factory class butuh set `$model` eksplisit, auto-resolve dua arah sama-sama gagal karena model tidak di `App\Models` — lihat ARCHITECTURE.md Section 3b untuk detail lengkap.
 
 ### UI
 
-- [ ] 2.15 `ItemController` + view: CRUD Product/Service Catalog, form dengan toggle `item_type` (physical_good/service) yang menyembunyikan field stock-related kalau `service`.
-- [ ] 2.16 `CustomerController` + view: CRUD dasar.
-- [ ] 2.17 `SalesOrderController` + Livewire component: form create order dengan dynamic item rows (tambah/hapus baris, kalkulasi subtotal otomatis saat quantity/harga berubah).
-- [ ] 2.18 View detail Sales Order: tampilkan status (Status Badge sesuai DESIGN.md), item list, tombol "Complete Order" yang memanggil `completeOrder()`.
-- [ ] 2.19 View stock adjustment: form manual dengan field reason code wajib diisi.
-- [ ] 2.20 View list stock movement per item (riwayat in/out/adjustment).
+- [x] 2.15 `ItemController` + view: CRUD Product/Service Catalog, form dengan toggle `item_type` (physical_good/service) yang menyembunyikan field stock-related kalau `service`.
+- [x] 2.15a **Gap ditemukan setelah 2.15**: `item_categories` (DATABASE.md Section 4.2) tidak punya cara diisi lewat UI — tidak ada task M2 manapun yang bikin CRUD untuk `ItemCategory`, padahal form Item create/edit mengasumsikan dropdown kategori terisi. `ItemController@create` manapun memanggil `$categories = ItemCategory::orderBy('name')->get()` tapi dari awal tabelnya kosong. Fix: `ItemCategoryController` minimal (index + store saja, tanpa edit/delete — schema cuma `id`+`name` tanpa field lain, full CRUD tidak proporsional), halaman kecil `item-categories/index.blade.php` dengan form tambah inline, diakses lewat tombol "Kelola Kategori" di halaman Item Catalog. Permission baru `sales.category.manage`. **Pelajaran untuk M3**: entity lookup/reference sederhana (mirip `item_categories`, kandidatnya `departments`/`positions` di M3) perlu dicek eksplisit di planning task apakah sudah ada cara mengisinya lewat UI atau seeder, jangan asumsikan dropdown-nya otomatis terisi hanya karena schema-nya sudah dimigrate.
+- [x] 2.16 `CustomerController` + view: CRUD dasar.
+- [x] 2.17 `SalesOrderController` + Livewire component: form create order dengan dynamic item rows (tambah/hapus baris, kalkulasi subtotal otomatis saat quantity/harga berubah). **Wajib ikuti pola associative-array `wire:key` dari M1** (lihat SESSION_SUMMARY_M1.md poin 3): key stabil per baris (`nextLineKey++`), bukan index array, dipakai konsisten di `wire:key`, `wire:model`, dan parameter `removeItem()`. **Terverifikasi diterapkan.**
+- [x] 2.18 View detail Sales Order: tampilkan status (Status Badge sesuai DESIGN.md), item list, tombol "Complete Order" yang memanggil `completeOrder()`. Tombol "Cancel Order" (hanya tampil untuk status `draft`) dengan modal konfirmasi berisi textarea `cancel_reason` wajib diisi sebelum submit — mirror pola modal void journal entry dari M1 task 1.11a, termasuk gotcha toggle `hidden`+`flex` sekaligus lewat JS (lihat SESSION_SUMMARY_M1.md poin 8).
+- [x] 2.19 View stock adjustment: form manual dengan field reason code wajib diisi.
+- [x] 2.20 View list stock movement per item (riwayat in/out/adjustment).
 
 ### Integrasi ke Finance
 
-- [ ] 2.21 Isi logic nyata di `CreateJournalEntryFromSalesOrder::handle()` (listener dari M1 task 1.15): generate `invoices` record, generate `journal_entries` + `journal_entry_lines` (debit piutang, kredit pendapatan) lewat `JournalEntryService` yang sudah dibuat di M1.
-- [ ] 2.22 `InvoiceController` + view: detail invoice, tombol record payment.
-- [ ] 2.23 Form record payment terhadap invoice, update status invoice jadi `paid` setelah full payment tercatat.
+- [x] 2.21 Isi logic nyata di `CreateJournalEntryFromSalesOrder::handle()` (listener dari M1 task 1.15): baca `Invoice` dari `invoice_id` di payload event (sudah dibuat sync di task 2.14, listener **tidak** membuat invoice lagi). Group `sales_order_items` per `item_type` sebelum membangun baris jurnal (lihat DATABASE.md Appendix C, catatan pemetaan): jumlahkan subtotal `physical_good` → kredit 402, jumlahkan subtotal `service` → kredit 401, satu baris debit 103 (Piutang) sebesar total gabungan, dan kalau ada item `physical_good` tambahkan pasangan debit 501/kredit 105 sebesar total HPP (`cost_price` × quantity, dijumlahkan lintas item fisik). Panggil `JournalEntryService::createEntry()` dengan seluruh baris ini sekaligus dalam satu journal entry.
+- [x] 2.22 `InvoiceController` + view (di module Finance): detail invoice, tombol record payment.
+- [x] 2.23 Form record payment terhadap invoice, update status invoice jadi `paid` setelah full payment tercatat. **Ditambah di luar spesifikasi awal**: journal entry pelunasan AR per payment (lihat catatan gap di atas), validasi anti-overpayment.
 
 ### Test M2
 
-- [ ] 2.24 Feature test end-to-end: buat sales order dengan item fisik → complete order → assert stok berkurang, invoice terbuat, journal entry pendapatan+piutang otomatis muncul dengan angka yang benar.
-- [ ] 2.25 Unit test `InventoryService`: assert `decreaseStock` menolak kalau stok tidak cukup, assert `recordAdjustment` menolak kalau `reasonCode` kosong.
+- [x] 2.24 Feature test end-to-end: buat sales order dengan item fisik saja → complete order → assert stok berkurang, invoice terbuat sync (tanpa perlu `Queue::fake()` untuk invoice-nya), journal entry pendapatan+HPP+piutang otomatis muncul dengan angka yang benar. **Terverifikasi, dan test ini yang menangkap bug `fulfillReservedStock()` di atas.**
+- [x] 2.24a Feature test end-to-end: buat sales order **campuran** (item `physical_good` + `service` dalam satu order) → complete order → assert journal entry mengalokasikan pendapatan ke akun 401 dan 402 secara terpisah dengan angka yang benar per akun (bukan cuma assert total debit = total credit), assert HPP cuma dihitung dari item fisik. **Terverifikasi pass.**
+- [x] 2.24b Feature test: buat sales order → cancel order → assert `quantity_reserved` kembali ke semula, assert tidak ada row baru di `stock_movements`, assert status jadi `cancelled` dengan `cancel_reason` terisi, assert cancel ditolak kalau dicoba pada order yang sudah `completed`. **Terverifikasi pass.**
+- [x] 2.25 Unit test `InventoryService`: assert `decreaseStock` menolak kalau stok tidak cukup, assert `recordAdjustment` menolak kalau `reasonCode` kosong, assert `releaseReservedStock` mengurangi `quantity_reserved` tanpa membuat `stock_movements` baru. **Ditambah**: assert `reserveStock` menolak kalau available tidak cukup, assert `recordAdjustment` direction `out` menolak kalau stok tidak cukup, assert `fulfillReservedStock` mengurangi `quantity_on_hand` dan `quantity_reserved` sekaligus (regresi test untuk bug di atas). **7/7 pass.**
 
 ### Review Exit Criteria M2
 
-- [ ] 2.26 Verifikasi terhadap ROADMAP.md M2: alur sales order sampai invoice jalan penuh, integrasi ke Finance otomatis tanpa input manual.
+- [x] 2.26 Verifikasi terhadap ROADMAP.md M2: alur sales order sampai invoice jalan penuh (invoice muncul sync tanpa jeda queue), integrasi ke Finance otomatis tanpa input manual dengan alokasi akun benar untuk order campuran, cancel order melepas reservasi dengan benar tanpa meninggalkan stok terkunci. **Terverifikasi**: full test suite 50/50 pass (poin E), alur end-to-end (poin A-D) terverifikasi berulang kali sepanjang sesi lewat siklus manual test — create order campuran, complete order, cek invoice+journal entry per-akun, cancel order, record payment partial+full. **M2 selesai**, lihat `SESSION_SUMMARY_M2.md`.
 
 ---
 

@@ -54,7 +54,7 @@
         <p class="text-body-sm text-slate-gray mb-4">Journal entry accrual (debit akun di atas, kredit 201 Utang Usaha) akan digenerate otomatis saat bill disimpan.</p>
 
         <div class="flex justify-end gap-3">
-            <x-button variant="secondary" href="{{ route('finance.vendor-bills.index') }}">Batal</x-button>
+            <x-button variant="danger" href="{{ route('finance.vendor-bills.index') }}">Batal</x-button>
             <x-button variant="primary" type="submit">Simpan</x-button>
         </div>
     </form>

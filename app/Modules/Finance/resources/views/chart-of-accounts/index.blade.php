@@ -3,21 +3,16 @@
         <h1 class="text-heading font-medium text-ink-black">Chart of Accounts</h1>
     </x-slot>
 
-    <div class="bg-paper-white border border-border-gray rounded-card shadow-subtle overflow-hidden">
-        <table class="w-full text-body">
-            <thead class="bg-fog-white text-label text-slate-gray">
-                <tr>
-                    <th class="text-left px-4 py-3">Kode</th>
-                    <th class="text-left px-4 py-3">Nama Akun</th>
-                    <th class="text-left px-4 py-3">Tipe</th>
-                    <th class="text-left px-4 py-3">Postable</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach ($accounts as $account)
-                    @include('finance::chart-of-accounts.partials.row', ['account' => $account, 'depth' => 0])
-                @endforeach
-            </tbody>
-        </table>
-    </div>
+    <x-data-table
+        :headers="['Kode', 'Nama Akun', 'Tipe', 'Postable']"
+        :empty="$accounts->isEmpty()"
+    >
+        <x-slot name="emptyState">
+            <p class="text-body-sm text-slate-gray">Belum ada akun, jalankan seeder Chart of Accounts.</p>
+        </x-slot>
+
+        @foreach ($accounts as $account)
+            @include('finance::chart-of-accounts.partials.row', ['account' => $account, 'depth' => 0])
+        @endforeach
+    </x-data-table>
 </x-app-layout>

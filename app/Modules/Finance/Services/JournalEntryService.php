@@ -7,12 +7,15 @@ use App\Modules\Finance\Exceptions\UnbalancedJournalEntryException;
 use App\Modules\Finance\Exceptions\VoidReasonRequiredException;
 use App\Modules\Finance\Models\ChartOfAccount;
 use App\Modules\Finance\Models\JournalEntry;
+use App\Shared\Support\GeneratesSequentialNumber;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class JournalEntryService
 {
+    use GeneratesSequentialNumber;
+
     /**
      * Buat journal entry baru dengan balance check dan validasi akun postable.
      *
@@ -37,7 +40,13 @@ class JournalEntryService
 
         return DB::transaction(function () use ($data, $lines) {
             $entryDate = Carbon::parse($data['entry_date']);
-            $entryNumber = $this->generateEntryNumber($entryDate);
+
+            $entryNumber = $this->generateSequentialNumber(
+                table: 'journal_entries',
+                column: 'entry_number',
+                prefix: 'JE',
+                year: $entryDate->year,
+            );
 
             $entry = JournalEntry::create([
                 'entry_number' => $entryNumber,
@@ -116,30 +125,5 @@ class JournalEntryService
 
             throw new NonPostableAccountException($invalidCodes);
         }
-    }
-
-    /**
-     * Generate entry_number format JE-{YYYY}-{6 digit sequential}, sequence reset tiap tahun.
-     * Tahun diambil dari entry_date (tanggal transaksi), bukan tanggal sistem saat entry dibuat.
-     *
-     * Catatan: lockForUpdate() di sini mengunci baris terakhir tahun berjalan untuk mencegah
-     * race condition nomor duplikat saat dua request submit bersamaan. Kalau belum ada baris
-     * sama sekali di tahun itu, tidak ada yang bisa dikunci — pada skala solo-developer/low-concurrency
-     * ini diterima sebagai simplifikasi, bukan dijamin 100% race-free di volume tinggi.
-     */
-    protected function generateEntryNumber(Carbon $entryDate): string
-    {
-        $year = $entryDate->year;
-
-        $lastNumber = JournalEntry::where('entry_number', 'like', "JE-{$year}-%")
-            ->lockForUpdate()
-            ->orderByDesc('entry_number')
-            ->value('entry_number');
-
-        $nextSequence = $lastNumber
-            ? ((int) substr($lastNumber, -6)) + 1
-            : 1;
-
-        return sprintf('JE-%d-%06d', $year, $nextSequence);
     }
 }

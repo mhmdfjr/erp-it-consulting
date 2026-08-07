@@ -5,7 +5,7 @@
         @csrf
         @include('finance::vendors.partials.form')
         <div class="flex justify-end gap-3 mt-6">
-            <x-button variant="secondary" href="{{ route('finance.vendors.index') }}">Batal</x-button>
+            <x-button variant="danger" href="{{ route('finance.vendors.index') }}">Batal</x-button>
             <x-button variant="primary" type="submit">Simpan</x-button>
         </div>
     </form>

@@ -3,7 +3,7 @@
 ## Sistem ERP - Perusahaan IT Service & Consulting
 
 Status: Draft v1.0
-Terakhir diperbarui: 2026-07-30
+Terakhir diperbarui: 2026-08-03 (revisi M2)
 
 ---
 
@@ -98,6 +98,31 @@ Setiap module folder itu self-contained: punya routes, views, migration, dan ser
 
 Tiap `loadViewsFrom()` di ServiceProvider module WAJIB dikasih namespace unik (contoh: `loadViewsFrom(__DIR__.'/../resources/views', 'identity')`), dipanggil sebagai `view('identity::users.index')`. Tanpa namespace, view dengan nama file sama di module berbeda (misal semua module punya `index.blade.php`) akan collision di view resolver Laravel. Konvensi: namespace sama dengan nama module lowercase (`identity`, `finance`, `sales`, `hr`).
 
+## 3b. Factory Resolution untuk Model di `app/Modules/{Module}/Models`
+
+Gotcha yang ditemukan saat menulis unit test M2, satu kelas dengan gotcha namespace `make:model`/`make:seeder` yang sudah dicatat di SESSION_SUMMARY_M1.md poin 7 — sama-sama akibat model project ini tidak tinggal di lokasi default `App\Models` yang diasumsikan konvensi Laravel.
+
+`Illuminate\Database\Eloquent\Factories\HasFactory::factory()` menebak nama factory class dengan mengganti prefix `App\Models` menjadi `Database\Factories` lalu menambah suffix `Factory`. Untuk model di `App\Modules\SalesInventory\Models\Item`, tebakan itu jadi `Database\Factories\Modules\SalesInventory\Models\ItemFactory` — path yang tidak pernah ada, karena `make:factory` selalu menaruh file factory flat di `database/factories/`, apapun namespace model targetnya.
+
+**Konsekuensi wajib untuk setiap Model di module manapun yang butuh factory** (dua langkah, keduanya diperlukan, salah satu saja tidak cukup):
+
+1. Model override `newFactory()` secara eksplisit, menunjuk ke factory class-nya:
+
+    ```php
+    protected static function newFactory()
+    {
+        return \Database\Factories\ItemFactory::new();
+    }
+    ```
+
+2. Factory class eksplisit set property `$model`, jangan andalkan auto-guess arah sebaliknya (dari `Database\Factories\ItemFactory` factory resolver juga bisa salah tebak balik ke `App\Item`, bukan `App\Modules\SalesInventory\Models\Item`):
+
+    ```php
+    protected $model = \App\Modules\SalesInventory\Models\Item::class;
+    ```
+
+Tanpa langkah 1, `Item::factory()` throw `BadMethodCallException` (method `factory()` tidak resolve target apapun). Tanpa langkah 2 (meski langkah 1 sudah benar), factory berhasil ditemukan tapi `newModel()` di dalamnya salah tebak model target dan throw `Class "App\Item" not found`. Kedua arah tebakan sama-sama berasumsi model tinggal di `App\Models`, jadi kedua sisi wajib dibuat eksplisit.
+
 ## 4. Service Layer Convention
 
 Pola konsisten dipakai di semua module:
@@ -115,20 +140,47 @@ Contoh alur konkret, pembuatan Sales Order:
 4. Setelah commit, `SalesOrderService` fire event `SalesOrderCreated`.
 5. Controller redirect ke halaman detail order dengan flash message sukses.
 
-Event `SalesOrderCreated` di atas beda dari `SalesOrderCompleted` yang disebut di DATABASE.md. Perlu didefinisikan jelas: `SalesOrderCreated` dipicu saat order dibuat (masih status draft/confirmed), sedangkan `SalesOrderCompleted` dipicu saat status berubah jadi `completed` (biasanya lewat aksi eksplisit "Complete Order" oleh user, memicu pembuatan invoice dan journal entry). Dua event ini punya listener yang beda, jangan digabung jadi satu event dengan payload status yang di-cek manual di listener, karena itu membuat listener harus tahu detail state machine module lain.
+Event `SalesOrderCreated` di atas beda dari `SalesOrderCompleted` yang disebut di DATABASE.md. Perlu didefinisikan jelas: `SalesOrderCreated` dipicu saat order dibuat (masih status `draft`), sedangkan `SalesOrderCompleted` dipicu saat status berubah jadi `completed` (biasanya lewat aksi eksplisit "Complete Order" oleh user, memicu pembuatan invoice dan journal entry). Dua event ini punya listener yang beda, jangan digabung jadi satu event dengan payload status yang di-cek manual di listener, karena itu membuat listener harus tahu detail state machine module lain.
+
+Contoh alur konkret kedua, penyelesaian Sales Order (keputusan M2, lihat DATABASE.md ASUMSI 7):
+
+1. `SalesOrderController@complete` menerima request, panggil `SalesOrderService::completeOrder($order)`.
+2. `SalesOrderService` melakukan, dalam satu database transaction: ubah `status` jadi `completed`, panggil `InventoryService::decreaseStock()` untuk tiap item `physical_good`, **generate record `Invoice`** (nomor, tanggal, due date, amount dari `total_amount` order), commit transaction.
+3. Setelah commit, `SalesOrderService` fire event `SalesOrderCompleted` dengan payload `sales_order_id` **dan** `invoice_id` (bukan cuma `sales_order_id`).
+4. Listener `CreateJournalEntryFromSalesOrder` (queued, di Finance module) menerima event, membaca invoice yang sudah ada, membuat `journal_entries` terkait.
+5. Controller redirect ke halaman detail order/invoice dengan flash message sukses.
+
+**Heuristik menentukan logic masuk Service (sync) vs Listener (queued/async)**: bukan soal "semua efek lintas module harus lewat event queued". Pembeda yang dipakai di sini adalah apakah suatu efek adalah **bagian dari definisi bisnis proses itu sendiri** (fixed, deterministik, murah secara komputasi) versus **keputusan/efek finansial lintas module yang lebih berat atau punya failure mode yang perlu diisolasi dari request asal**.
+
+- Invoice generation adalah transformasi administratif yang PRD.md Section 4.4 sendiri definisikan sebagai bagian dari "complete order" (invoice digenerate dari Sales Order yang sudah completed). Ini tetap sync di `SalesOrderService`, supaya user yang klik "Complete Order" langsung melihat invoice tanpa jeda tak terprediksi menunggu queue worker.
+- Journal entry adalah efek finansial lintas module yang triggernya sudah pasti (tidak butuh keputusan tambahan), tapi prosesnya perlu diisolasi dari request asal supaya kegagalan sementara di Finance module tidak membuat "Complete Order" gagal total. Ini tetap queued di Listener, sesuai Section 5.
+
+Prinsip yang sama berlaku untuk kasus serupa di M3: generate slip gaji breakdown (`payroll_run_items`) adalah bagian definisi `PayrollService::processPayrollRun()` itu sendiri (sync), sedangkan journal entry beban gaji dari `PayrollProcessed` tetap di listener queued (async).
+
+## 4a. Shared Sequential Number Generator
+
+`entry_number` (Finance, M1), `order_number` dan `invoice_number` (M2) semuanya butuh pola generation yang identik: format `{PREFIX}-{YYYY}-{6 digit sequential}`, sequence reset tiap tahun, dicari dari nomor terakhir tahun yang sama lalu di-increment. Menulis logic ini tiga kali secara terpisah berisiko divergent bug (misal salah satu implementasi lupa handle year-rollover di pergantian 31 Desember ke 1 Januari, atau race condition saat concurrent create tidak di-lock dengan cara yang sama).
+
+Detail penting yang harus konsisten di ketiga pemakaian: tahun pada nomor mengikuti **tanggal transaksi/entitas** (`entry_date` untuk journal entry), bukan tanggal sistem saat record dibuat (`now()->year`). Ini behavior asli `JournalEntryService` M1 yang wajib dipertahankan saat extract ke trait — kalau nanti `SalesOrderService`/invoice generator juga punya field tanggal yang bisa berbeda dari tanggal input (backdated), trait harus terima `$year` sebagai parameter eksplisit dari caller, bukan menghitung sendiri `now()->year` di dalam trait.
+
+**Keputusan (M2)**: extract jadi trait `app/Shared/Support/GeneratesSequentialNumber.php`, method `generateSequentialNumber(string $table, string $column, string $prefix, int $year)`, dipakai oleh `JournalEntryService` (refactor dari M1, tanpa mengubah format `entry_number` yang sudah berjalan), `SalesOrderService` (`order_number`, tahun dari `order_date`), dan proses invoice generation di `SalesOrderService::completeOrder()` (`invoice_number`, tahun dari `invoice_date`). Trait pakai `DB::table()` query builder (bukan Eloquent Model) supaya generik lintas tabel tanpa perlu tahu class Model target, dan tetap kompatibel dengan `lockForUpdate()` untuk mencegah race condition nomor duplikat pada concurrent request — wajib dipanggil di dalam DB transaction yang sudah terbuka oleh caller.
+
+Refactor `JournalEntryService` ini menyentuh kode M1 yang sudah production-tested (10 unit/feature test Finance), jadi dilakukan sebagai task terpisah dengan re-run test M1 penuh sebelum lanjut ke task M2 lainnya — supaya kalau ada regresi, sumbernya jelas dari refactor ini, bukan tercampur dengan perubahan M2 yang lain.
 
 ## 5. Domain Event Catalog
 
 Tabel ini didefinisikan sebagai kontrak antar module. Setiap event baru yang menyeberangi module boundary harus didaftarkan di sini supaya jelas siapa produce, siapa consume.
 
-| Event                 | Dipicu oleh                      | Ditangkap oleh                       | Efek                                                                                                                |
-| --------------------- | -------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| `SalesOrderCompleted` | SalesInventory module            | Finance module                       | Generate `invoices` dan `journal_entries` (pendapatan, piutang).                                                    |
-| `PayrollProcessed`    | HR module                        | Finance module                       | Generate `journal_entries` (beban gaji, utang BPJS, utang PPh21).                                                   |
-| `InvoicePaid`         | Finance module                   | SalesInventory module (opsional)     | Update status `sales_orders` jadi reflect pelunasan, kalau UI butuh menampilkan status pembayaran di halaman order. |
-| `StockAdjusted`       | SalesInventory module (internal) | Identity module (audit log listener) | Catat perubahan stok manual ke `audit_logs` dengan detail reason code.                                              |
+| Event                 | Dipicu oleh                      | Ditangkap oleh                       | Efek                                                                                                                                                                                                                                              |
+| --------------------- | -------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SalesOrderCompleted` | SalesInventory module            | Finance module                       | Generate `journal_entries` (pendapatan, HPP kalau ada barang fisik) mengacu ke `Invoice` yang sudah dibuat sync di `SalesOrderService::completeOrder()` (lihat Section 4, keputusan M2). Payload event membawa `sales_order_id` dan `invoice_id`. |
+| `PayrollProcessed`    | HR module                        | Finance module                       | Generate `journal_entries` (beban gaji, utang BPJS, utang PPh21).                                                                                                                                                                                 |
+| `InvoicePaid`         | Finance module                   | SalesInventory module (opsional)     | Update status `sales_orders` jadi reflect pelunasan, kalau UI butuh menampilkan status pembayaran di halaman order.                                                                                                                               |
+| `StockAdjusted`       | SalesInventory module (internal) | Identity module (audit log listener) | Catat perubahan stok manual ke `audit_logs` dengan detail reason code.                                                                                                                                                                            |
 
 Listener yang menangani efek finansial (`SalesOrderCompleted`, `PayrollProcessed`) sebaiknya di-queue (`ShouldQueue`), bukan synchronous, supaya kegagalan proses finansial tidak membuat request asal (misalnya klik "Complete Order") jadi lambat atau gagal total kalau ada masalah sementara di Finance module. Trade-off: butuh queue worker jalan (`php artisan queue:work` via Supervisor di production), dan perlu strategi retry serta dead-letter handling kalau listener gagal berkali-kali, supaya journal entry yang gagal dibuat tidak hilang diam-diam.
+
+**Cancel Order tidak butuh domain event baru (keputusan M2)**: `SalesOrderService::cancelOrder()` cuma valid dipanggil dari status `draft` (lihat DATABASE.md ASUMSI 8), yaitu sebelum `SalesOrderCompleted` pernah di-fire — belum ada efek Finance apapun (invoice, journal entry) yang perlu dikoreksi/di-void. Release stock reservation (`InventoryService::releaseReservedStock()`) murni internal ke SalesInventory module, tidak menyeberangi module boundary. Ini keputusan sadar, bukan oversight: kalau di masa depan muncul kebutuhan cancel order yang **sudah** completed, itu perubahan scope (return/refund flow, lihat PRD.md Section 2.3) yang butuh event baru (`SalesOrderCancelled` yang ditangkap Finance untuk membuat jurnal reversal), bukan sekadar extend `cancelOrder()` yang ada.
 
 **Konvensi lokasi Event dan Listener (keputusan final)**: Event class hidup di module **producer** (contoh: `SalesInventory/Events/SalesOrderCompleted.php`, `HR/Events/PayrollProcessed.php`), Listener hidup di module **consumer** (contoh: `Finance/Listeners/CreateJournalEntryFromSalesOrder.php`). Event adalah kontrak yang dimiliki module yang men-trigger-nya, module lain yang mau bereaksi cukup import class Event tersebut dan daftarkan listener-nya sendiri.
 
@@ -164,6 +216,15 @@ Trade-off: Livewire tidak cocok untuk UI yang sangat kompleks secara interaktif 
 ## 6a. Shared Blade Components
 
 Component reusable (`<x-button>`, `<x-input>`, `<x-badge>`, `<x-data-table>`, layout `<x-app-layout>`, `<x-sidebar>`, `<x-topbar>`) hidup di `resources/views/components/` (lokasi default Laravel), BUKAN di `app/Shared` atau folder module manapun. Alasan: ini genuinely shared UI layer lintas semua module, bukan business logic, dan Laravel auto-discovery bekerja langsung tanpa config tambahan di lokasi ini.
+
+## 6b. Alpine.js untuk Toggle UI Murni Client-Side (Keputusan M2)
+
+Livewire bundled bareng Alpine.js secara default (`package.json` sudah punya `alpinejs`), dan project ini secara sadar memakai keduanya untuk kasus yang berbeda, bukan kebetulan tercampur:
+
+- **Livewire**: state yang butuh data dari server atau logic yang tidak boleh dipercaya sepenuhnya di client (contoh: dynamic Sales Order item rows di M2, karena tiap baris butuh validasi `item_id` terhadap database, auto-fill `unit_price` dari master data, dan cek available stock).
+- **Alpine.js**: toggle visual murni yang tidak butuh round-trip server sama sekali (contoh: show/hide field `cost_price` di form Item tergantung `item_type` yang dipilih, show/hide field NPWP di form Customer tergantung `customer_type`). Pakai Livewire untuk kasus ini cuma nambah network request tanpa benefit apapun — state-nya tidak pernah perlu divalidasi ke server sebelum submit form.
+
+Aturan pembeda: kalau toggle/interaksi butuh baca data dari database atau validasi server-side, pakai Livewire. Kalau cuma show/hide/toggle class berdasarkan pilihan yang sudah ada di client, pakai Alpine. Jangan campur keduanya dalam satu komponen kecil yang sama (misalnya jangan taruh `x-data` Alpine di dalam Livewire component blade yang sama-sama mengelola field yang sama) — pilih satu per form/komponen supaya jelas siapa yang jadi source of truth untuk state itu.
 
 ## 7. Autentikasi dan Autorisasi
 

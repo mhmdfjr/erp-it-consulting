@@ -16,7 +16,7 @@ class EventListenerRegistrationTest extends TestCase
     {
         Queue::fake();
 
-        event(new SalesOrderCompleted(salesOrderId: 1));
+        event(new SalesOrderCompleted(salesOrderId: 1, invoiceId: 1));
 
         Queue::assertPushed(CallQueuedListener::class, function ($job) {
             return $job->class === CreateJournalEntryFromSalesOrder::class;

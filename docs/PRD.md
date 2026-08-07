@@ -3,7 +3,7 @@
 ## Sistem ERP - Perusahaan IT Service & Consulting
 
 Status: Draft v1.0
-Terakhir diperbarui: 2026-07-30
+Terakhir diperbarui: 2026-08-03 (revisi M2)
 
 ---
 
@@ -45,6 +45,7 @@ Empat modul berikut masuk MVP, dengan detail scope per modul di Section 4.
 - **Multi-branch / multi-company** support.
 - **Timesheet & time tracking**. Tidak dibutuhkan karena billing fixed price per kontrak, bukan time & material.
 - **Integrasi eksternal** (payment gateway, e-Faktur, perbankan/VA otomatis). Dijadwalkan setelah MVP empat modul stabil.
+- **Return/refund flow untuk Sales Order yang sudah `completed`** (keputusan M2). Cancel Order di MVP cuma berlaku untuk status `draft`, sebelum stok direalisasi keluar dan invoice terbit. Order yang sudah completed (stok sudah keluar gudang, invoice sudah terbit) tidak bisa dibatalkan lewat sistem — kalau ada kebutuhan pembatalan pasca-completed (barang dikembalikan, kontrak jasa dibatalkan setelah invoice terbit), itu perlu return/refund flow dengan jurnal reversal yang eksplisit, didefer ke fase 2, bukan dianggap gap yang lupa dikerjakan di M2.
 
 Keputusan out-of-scope ini eksplisit supaya tidak ada scope creep saat development jalan. Kalau ada kebutuhan yang muncul dari salah satu poin di atas selama development, itu sinyal untuk update PRD ini dulu, bukan langsung diimplementasikan diam-diam.
 
@@ -118,15 +119,16 @@ Fungsi cross-cutting yang dipakai seluruh module lain, bukan module bisnis yang 
 
 Digabung dalam satu module folder karena proses bisnis erat terkait, tapi dengan service class terpisah untuk menjaga boundary:
 
-- `SalesOrderService`: menangani logic sales order, quotation, invoice generation.
-- `InventoryService`: menangani stock movement, dengan API eksplisit (`increaseStock()`, `decreaseStock()`, `reserveStock()`) supaya bisa dipakai module lain (misalnya Purchasing di fase berikutnya) tanpa menembus Sales logic.
+- `SalesOrderService`: menangani logic sales order, quotation, invoice generation, cancel order.
+- `InventoryService`: menangani stock movement, dengan API eksplisit (`increaseStock()`, `decreaseStock()`, `reserveStock()`, `releaseReservedStock()`, `fulfillReservedStock()`) supaya bisa dipakai module lain (misalnya Purchasing di fase berikutnya) tanpa menembus Sales logic. `releaseReservedStock()` dan `fulfillReservedStock()` ditambahkan sebagai kebutuhan konkret M2 (lihat Cancel Order dan Complete Order di bawah), bukan API yang tercantum sejak awal planning. Perbedaan keduanya: `releaseReservedStock()` melepas reservasi kembali ke pool tanpa mengurangi stok fisik (dipakai saat cancel), `fulfillReservedStock()` mengurangi stok fisik **dan** reservasi sekaligus (dipakai saat complete — reservasi dikonsumsi, bukan dilepas).
 
 **Functional requirements:**
 
 - Product/Service Catalog: master data item dengan flag `physical_good` (butuh stock tracking) atau `service` (tidak butuh stock, misal jasa konsultasi).
-- Sales Order: dibuat langsung dari quotation atau langsung sebagai order, merepresentasikan satu kontrak yang dibayar sekaligus (bukan termin).
-- Invoice: digenerate dari Sales Order yang sudah lunas syaratnya (fixed price, sekali bayar).
+- Sales Order: dibuat langsung dari quotation atau langsung sebagai order, merepresentasikan satu kontrak yang dibayar sekaligus (bukan termin). Satu order boleh berisi campuran item `physical_good` dan `service` sekaligus. **Form input item (keputusan M2)**: dropdown pemilihan item cuma menampilkan `service` (tanpa stock tracking) atau `physical_good` dengan available stock (`quantity_on_hand - quantity_reserved`) lebih dari 0 — item fisik yang stoknya habis tidak muncul sebagai opsi. Input quantity dibatasi maksimal sebesar available stock item yang dipilih. Ini mencegah user membuat order untuk stok yang jelas-jelas tidak cukup di tahap input, meski `InventoryService::reserveStock()` tetap jadi penegak final saat submit (untuk menangani race condition antar user).
+- Invoice: digenerate **secara sync** saat Sales Order di-complete (bagian dari `SalesOrderService::completeOrder()`, bukan efek asynchronous dari domain event), sesuai ARCHITECTURE.md Section 4.
 - Inventory: stock quantity tracking untuk item bertipe `physical_good`. Tidak termasuk multi-warehouse atau stock opname formal di MVP ini, cukup single location stock level.
+- **Cancel Order**: user bisa membatalkan Sales Order selama masih berstatus `draft`, dengan alasan pembatalan wajib diisi. Cancel melepas stock reservation yang sudah dibuat saat order dibuat, supaya stok tersedia kembali untuk order lain. Tidak berlaku untuk order yang sudah `completed` (lihat Section 2.3, return/refund flow di luar scope MVP).
 - Flow linear tanpa approval gate: sales order dibuat, invoice digenerate, tidak ada tahap approval manager sebelum invoice terbit.
 
 **Non-goals (MVP):** tidak ada multi-warehouse, tidak ada Purchasing module formal (restock dicatat sebagai manual stock adjustment), tidak ada CRM/lead pipeline.

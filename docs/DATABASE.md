@@ -4,7 +4,7 @@
 
 Status: Draft v1.0
 Database: PostgreSQL
-Terakhir diperbarui: 2026-07-30
+Terakhir diperbarui: 2026-08-03 (revisi M2)
 
 ---
 
@@ -16,6 +16,9 @@ Dua open question dari PRD.md belum terjawab final. Schema di bawah dibuat denga
 - **ASUMSI 2 - Tabel TER**: **sudah tidak lagi asumsi**, data resmi TER Bulanan (kategori A/B/C) berdasarkan PMK 168/2023 sudah tersedia dan dimasukkan sebagai seed data di Appendix A. TER Harian untuk pegawai tidak tetap **resmi di luar scope MVP**, didefer ke fase 2 (lihat Section 2.9). Schema saat ini hanya mendukung employee dengan skema penggajian bulanan (TER Bulanan).
 - **ASUMSI 3 - Stock adjustment**: `stock_movements` mewajibkan `reason_code` untuk movement bertipe `adjustment`, supaya ada jejak kenapa stok berubah di luar transaksi sales. Kalau ternyata tidak perlu reason code wajib, tinggal ubah constraint `NOT NULL` jadi nullable, tidak perlu migrasi struktural.
 - **ASUMSI 4 - Chart of Accounts**: seed data awal sudah tersedia di Appendix C, diadaptasi dari referensi CoA perusahaan jasa dan disesuaikan untuk bisnis campuran jasa+barang teknologi. Ini bukan hasil audit akuntan, tetap perlu direview sebelum go-live produksi (lihat catatan di Appendix C).
+- **ASUMSI 6 - Ownership tabel `invoices`/`payments`**: **sudah diputuskan** (M2), migration dan Model kedua tabel ini tinggal di module **Finance**, bukan `SalesInventory`, meski trigger pembuatannya berasal dari flow Sales Order. Alasan: ownership data ditentukan oleh siapa yang mendefinisikan lifecycle dan invariant-nya (status unpaid/paid/void, relasi ke `journal_entries`), bukan oleh siapa yang memicunya — sama seperti `journal_entries` sendiri tidak ditaruh di SalesInventory meski dipicu event dari sana. Lihat Section 3.6/3.7 untuk detail.
+- **ASUMSI 7 - Invoice generation timing**: **sudah diputuskan** (M2), `Invoice` digenerate **sync** di dalam `SalesOrderService::completeOrder()`, dalam DB transaction yang sama dengan `InventoryService::decreaseStock()`. Event `SalesOrderCompleted` baru di-fire setelah commit, membawa payload `sales_order_id` **dan** `invoice_id` yang sudah ada. Listener `CreateJournalEntryFromSalesOrder` (queued) tidak lagi bertanggung jawab membuat invoice, cuma membuat `journal_entries` dari invoice yang sudah ada. Alasan: invoice generation adalah transformasi administratif yang jadi bagian definisi bisnis "complete order" itu sendiri (PRD Section 4.4), bukan efek finansial lintas module yang butuh proteksi queue seperti journal entry. Menaruhnya di listener queued berarti user bisa selesai "Complete Order" tanpa invoice muncul sampai queue worker jalan, ambigu dan membingungkan secara UX.
+- **ASUMSI 8 - Sales Order cancellation**: **sudah diputuskan** (M2), `sales_orders.status` bisa bertransisi ke `cancelled` **hanya** dari `draft` (enum `confirmed` dihapus dari status flow M2 — tidak ada kode manapun yang pernah men-set order ke status itu, `createOrder()` selalu mulai dari `draft` dan langsung bisa menuju `completed`/`cancelled`). Tidak bisa cancel dari `completed`, karena itu butuh return/refund flow yang di luar scope MVP (lihat PRD.md Section 2.3). Cancel melepas stock reservation lewat `InventoryService::releaseReservedStock()`, yang mengurangi `stock_levels.quantity_reserved` langsung tanpa insert row baru di `stock_movements` (bukan physical movement barang, barang tidak pernah keluar gudang).
 - **ASUMSI 5 - HPP/COGS timing**: **sudah diputuskan**, pakai metode **perpetual** (real-time per transaksi), bukan periodic. Setiap `SalesOrderCompleted` untuk item `physical_good` menghasilkan dua pasang jurnal sekaligus: pendapatan (debit Piutang, kredit Pendapatan) dan HPP (debit 501 HPP, kredit 105 Persediaan). Nilai HPP diambil dari `items.cost_price` **tunggal** (last-cost), bukan FIFO atau weighted average — kalau harga modal barang berubah antar batch pembelian, sistem tidak melacak cost per-lot, cuma pakai `cost_price` yang tersimpan di `items` saat transaksi terjadi. Ini simplifikasi sadar untuk MVP: cocok kalau harga modal barang relatif stabil, kurang akurat kalau modal sering fluktuatif (misal karena kurs). Kalau kebutuhan akurasi costing meningkat di fase 2, ini butuh tabel tambahan (`stock_lots` atau sejenis) untuk valuation method yang lebih tepat, bukan sekadar perubahan konfigurasi.
 
 ---
@@ -402,24 +405,30 @@ Representasi minimal AP tanpa Purchasing module formal (sesuai PRD, PO ke vendor
 
 Invoice ke customer, digenerate dari Sales Order.
 
-| Column         | Type          | Constraint                      | Keterangan               |
-| -------------- | ------------- | ------------------------------- | ------------------------ |
-| id             | bigserial     | PK                              |                          |
-| sales_order_id | bigint        | FK -> sales_orders.id, NOT NULL |                          |
-| invoice_number | varchar(100)  | UNIQUE, NOT NULL                |                          |
-| invoice_date   | date          | NOT NULL                        |                          |
-| due_date       | date          | NOT NULL                        |                          |
-| amount         | numeric(15,2) | NOT NULL                        |                          |
-| status         | varchar(20)   | NOT NULL, DEFAULT 'unpaid'      | enum: unpaid, paid, void |
-| paid_at        | timestamptz   | NULL                            |                          |
-| created_at     | timestamptz   | NOT NULL                        |                          |
-| updated_at     | timestamptz   | NOT NULL                        |                          |
+**Kepemilikan module (keputusan M2, ASUMSI 6)**: migration dan Model `Invoice` tinggal di `app/Modules/Finance`, **bukan** `SalesInventory`, meski trigger pembuatannya berasal dari flow Sales Order. Ownership data ditentukan oleh siapa yang mendefinisikan lifecycle dan invariant-nya (status unpaid/paid/void, relasi ke `journal_entries`), bukan oleh siapa yang memicunya. Konsekuensi teknis: migration file `invoices` harus punya timestamp **setelah** migration `sales_orders` (TASKS.md task 2.6, folder `SalesInventory`), supaya FK constraint `sales_order_id` tidak gagal saat `php artisan migrate` — Laravel menjalankan migration berurutan berdasarkan timestamp filename, bukan berdasarkan module mana yang me-load-nya lewat `loadMigrationsFrom()`.
+
+**Timing generation (keputusan M2, ASUMSI 7)**: `Invoice` digenerate **sync** di `SalesOrderService::completeOrder()`, dalam DB transaction yang sama dengan `InventoryService::decreaseStock()`. Event `SalesOrderCompleted` baru di-fire setelah commit dengan payload `sales_order_id` dan `invoice_id`. Listener `CreateJournalEntryFromSalesOrder` (queued) tidak membuat invoice, cuma membaca invoice yang sudah ada untuk membuat `journal_entries`.
+
+| Column         | Type          | Constraint                      | Keterangan                                                                                                                                  |
+| -------------- | ------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| id             | bigserial     | PK                              |                                                                                                                                             |
+| sales_order_id | bigint        | FK -> sales_orders.id, NOT NULL |                                                                                                                                             |
+| invoice_number | varchar(100)  | UNIQUE, NOT NULL                | format `INV-{YYYY}-{6 digit sequential}` misal `INV-2026-000001`, sequence reset tiap tahun, konsisten dengan `entry_number` di Section 3.2 |
+| invoice_date   | date          | NOT NULL                        |                                                                                                                                             |
+| due_date       | date          | NOT NULL                        |                                                                                                                                             |
+| amount         | numeric(15,2) | NOT NULL                        |                                                                                                                                             |
+| status         | varchar(20)   | NOT NULL, DEFAULT 'unpaid'      | enum: unpaid, paid, void                                                                                                                    |
+| paid_at        | timestamptz   | NULL                            |                                                                                                                                             |
+| created_at     | timestamptz   | NOT NULL                        |                                                                                                                                             |
+| updated_at     | timestamptz   | NOT NULL                        |                                                                                                                                             |
 
 Index: `invoice_number` (unique), `sales_order_id`, `status` (untuk filter unpaid invoice).
 
 ### 3.7 `payments`
 
 Pembayaran masuk dari customer terhadap invoice. Karena kontrak dibayar sekaligus (bukan termin), satu invoice idealnya satu payment, tapi tabel tetap dirancang one-to-many untuk menampung kasus partial payment atau pembayaran lebih dari sekali secara administratif.
+
+**Kepemilikan module**: migration dan Model `Payment` tinggal di `app/Modules/Finance`, sama seperti `Invoice` (lihat catatan Section 3.6, ASUMSI 6).
 
 | Column           | Type          | Constraint                  | Keterangan          |
 | ---------------- | ------------- | --------------------------- | ------------------- |
@@ -490,9 +499,13 @@ Single location stock, sesuai scope MVP (bukan multi-warehouse).
 
 Constraint aplikasi: row ini hanya boleh ada untuk item dengan `item_type = physical_good`. Di-enforce di `InventoryService`, bukan database constraint, karena PostgreSQL tidak bisa cross-table CHECK constraint langsung.
 
+**Release reservation (keputusan M2, ASUMSI 8)**: saat Sales Order di-cancel, `InventoryService::releaseReservedStock()` mengurangi `quantity_reserved` langsung di row ini. Ini **bukan** physical movement (barang tidak pernah keluar gudang), jadi **tidak** menghasilkan row baru di `stock_movements` — cukup update kolom `quantity_reserved` saja. Lihat catatan Section 4.5 untuk kenapa batas ini penting dijaga.
+
+**Fulfill reservation saat completeOrder (keputusan M2, bug ditemukan lewat test 2.24)**: saat Sales Order di-complete, `InventoryService::fulfillReservedStock()` mengurangi `quantity_on_hand` **dan** `quantity_reserved` sekaligus dalam satu transaction — berbeda dari `releaseReservedStock()`, di sini reservasi **dikonsumsi** (stok benar-benar keluar), bukan dilepas kembali ke pool. Draf awal `completeOrder()` sempat cuma panggil `decreaseStock()` (yang tidak menyentuh `quantity_reserved` sama sekali), menyebabkan `quantity_reserved` nyangkut permanen setiap kali order completed — ditangkap lewat feature test sebelum sempat masuk production, bukan lewat verifikasi manual.
+
 ### 4.5 `stock_movements`
 
-Log seluruh perubahan stok, baik dari sales maupun manual adjustment.
+Log seluruh perubahan stok **fisik**, baik dari sales maupun manual adjustment. Tabel ini murni jejak pergerakan barang yang benar-benar keluar/masuk gudang, **bukan** jejak perubahan reservasi. Release reservation dari Sales Order yang di-cancel (lihat Section 4.4) sengaja **tidak** dicatat di sini, karena stok fisik tidak pernah berpindah — kalau nanti ada kebutuhan audit trail untuk reservation lifecycle itu sendiri (dipesan/dilepas), itu domain terpisah dari `stock_movements`, jangan dipaksakan lewat `movement_type` baru semacam `reservation_release` yang mencampur physical movement dengan reservation bookkeeping.
 
 | Column         | Type          | Constraint               | Keterangan                                                                         |
 | -------------- | ------------- | ------------------------ | ---------------------------------------------------------------------------------- |
@@ -515,17 +528,22 @@ Index: `item_id`, composite `(reference_type, reference_id)`.
 
 Satu row merepresentasikan satu kontrak yang dibayar sekaligus.
 
-| Column       | Type          | Constraint                   | Keterangan                                             |
-| ------------ | ------------- | ---------------------------- | ------------------------------------------------------ |
-| id           | bigserial     | PK                           |                                                        |
-| order_number | varchar(100)  | UNIQUE, NOT NULL             |                                                        |
-| customer_id  | bigint        | FK -> customers.id, NOT NULL |                                                        |
-| order_date   | date          | NOT NULL                     |                                                        |
-| status       | varchar(20)   | NOT NULL, DEFAULT 'draft'    | enum: draft, confirmed, invoiced, completed, cancelled |
-| total_amount | numeric(15,2) | NOT NULL                     |                                                        |
-| created_by   | bigint        | FK -> users.id, NOT NULL     |                                                        |
-| created_at   | timestamptz   | NOT NULL                     |                                                        |
-| updated_at   | timestamptz   | NOT NULL                     |                                                        |
+**Format `order_number` (keputusan M2)**: `SO-{YYYY}-{6 digit sequential}` misal `SO-2026-000001`, sequence reset tiap tahun, digenerate lewat trait shared `GeneratesSequentialNumber` (lihat ARCHITECTURE.md Section 4a), konsisten dengan `entry_number` (Section 3.2) dan `invoice_number` (Section 3.6).
+
+**Aturan transisi status ke `cancelled` (keputusan M2, ASUMSI 8)**: hanya valid dari `draft`. **Tidak** bisa cancel dari `completed` — itu butuh return/refund flow yang di luar scope MVP (lihat PRD.md Section 2.3). `SalesOrderService::cancelOrder()` men-guard transisi ini di level aplikasi, melepas stock reservation lewat `InventoryService::releaseReservedStock()` untuk tiap item `physical_good` di order tersebut.
+
+| Column        | Type          | Constraint                              | Keterangan                                                                                                                             |
+| ------------- | ------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| id            | bigserial     | PK                                      |                                                                                                                                        |
+| order_number  | varchar(100)  | UNIQUE, NOT NULL                        | format `SO-{YYYY}-{6 digit sequential}`                                                                                                |
+| customer_id   | bigint        | FK -> customers.id, NOT NULL            |                                                                                                                                        |
+| order_date    | date          | NOT NULL                                |                                                                                                                                        |
+| status        | varchar(20)   | NOT NULL, DEFAULT 'draft'               | enum: draft, invoiced, completed, cancelled (`confirmed` dihapus dari flow M2, lihat ASUMSI 8 — tidak pernah di-set oleh kode manapun) |
+| total_amount  | numeric(15,2) | NOT NULL                                |                                                                                                                                        |
+| cancel_reason | text          | NULL, NOT NULL kalau status = cancelled | alasan wajib diisi saat cancel, dicek di level aplikasi seperti `void_reason` di `journal_entries`                                     |
+| created_by    | bigint        | FK -> users.id, NOT NULL                |                                                                                                                                        |
+| created_at    | timestamptz   | NOT NULL                                |                                                                                                                                        |
+| updated_at    | timestamptz   | NOT NULL                                |                                                                                                                                        |
 
 Index: `order_number` (unique), `customer_id`, `status`.
 
@@ -852,11 +870,18 @@ Ini seed data awal yang wajar untuk mulai development, bukan hasil audit dari ak
 
 **Catatan pemetaan ke transaksi otomatis** (dipakai saat menulis listener `CreateJournalEntryFromSalesOrder` dan `CreateJournalEntryFromPayroll` di M2/M3, dan `VendorBillService` di M1):
 
-- Sales Order completed (barang fisik): **wajib** dua pasang jurnal sekaligus (perpetual, lihat ASUMSI 5 di Section 0, sudah diputuskan bukan opsional lagi) — (1) debit 103 (Piutang Usaha), kredit 402 (Pendapatan Penjualan Barang Teknologi), (2) debit 501 (Harga Pokok Penjualan Barang), kredit 105 (Persediaan Barang Dagang) sebesar `cost_price` dikali quantity terjual.
-- Sales Order completed (jasa konsultasi): debit 103 (Piutang Usaha), kredit 401 (Pendapatan Jasa Konsultasi IT). Tidak ada jurnal HPP karena jasa tidak punya `cost_price`/persediaan.
+- **Sales Order completed, termasuk order campuran barang+jasa (keputusan M2)**: satu `sales_order` bisa berisi campuran `sales_order_items` dengan `item_type` berbeda (barang fisik dan jasa dalam satu order/kontrak yang sama), schema tidak melarang ini. Listener **wajib** melakukan grouping per `item_type` dulu sebelum membangun baris jurnal, bukan asumsi satu order = satu jenis item:
+    1. Jumlahkan `subtotal` seluruh `sales_order_items` dengan `item_type = physical_good` → kredit 402 (Pendapatan Penjualan Barang Teknologi) sebesar total ini, kalau > 0.
+    2. Jumlahkan `subtotal` seluruh `sales_order_items` dengan `item_type = service` → kredit 401 (Pendapatan Jasa Konsultasi IT) sebesar total ini, kalau > 0.
+    3. Satu baris debit 103 (Piutang Usaha) sebesar jumlah kedua total di atas (piutang digabung, tidak dipecah per item_type).
+    4. Kalau ada item `physical_good` dalam order (`total HPP > 0`): tambah pasangan baris debit 501 (Harga Pokok Penjualan Barang), kredit 105 (Persediaan Barang Dagang) sebesar `cost_price` dikali quantity, dijumlahkan lintas seluruh item fisik di order tersebut (perpetual, lihat ASUMSI 5 di Section 0).
+
+    Tanpa grouping ini, jurnal tetap balance secara total debit=credit (`JournalEntryService::createEntry()` tidak menolaknya), tapi alokasi ke akun pendapatan 401 vs 402 bisa salah untuk order campuran — bug ini tidak terdeteksi otomatis dan baru kelihatan saat laporan laba rugi per akun sudah salah, jauh setelah entry di-posting (dan sudah immutable, koreksi cuma lewat void manual).
+
 - Payroll processed: debit 511 (Beban Gaji), debit 512/513 (Beban BPJS Perusahaan), kredit 202 (Utang Gaji) atau langsung kredit 101/102 kalau net pay langsung dibayar, kredit 203 (Utang PPh21), kredit 204/205 (Utang BPJS).
 - Vendor bill dibuat (M1, accrual basis): debit `vendor_bills.account_id` (akun beban/aset sesuai bill), kredit 201 (Utang Usaha) sebesar `amount`.
 - Vendor bill dibayar (status → paid): debit 201 (Utang Usaha), kredit 101/102 (Kas/Bank) sebesar `amount`.
+- **Invoice dibayar (keputusan M2, ditambal karena tidak eksplisit ada di spesifikasi awal task 2.23)**: debit 101/102 (Kas/Bank, dipilih dari `payment_method` — `cash` ke 101, selain itu default 102), kredit 103 (Piutang Usaha) sebesar `payment.amount`. Jurnal dibuat **per payment**, bukan cuma saat invoice full paid — beda dari vendor bill (AP) yang cuma toggle status tanpa payment detail terpisah (DATABASE.md Section 3.5), karena `payments` di sisi AR memang dirancang mendukung partial payment (Section 3.7), jadi tiap penerimaan kas perlu tercatat di tanggal transaksinya masing-masing untuk akurasi buku besar. **Asumsi belum dikonfirmasi**: pemilihan akun 101 vs 102 berdasarkan `payment_method`, perlu direview kalau perusahaan punya konvensi berbeda.
 
 ---
 

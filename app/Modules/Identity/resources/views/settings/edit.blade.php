@@ -21,7 +21,8 @@
 
         <x-input name="description" label="Deskripsi" :value="old('description', $setting->description)" />
 
-        <div class="flex justify-end">
+        <div class="flex justify-end gap-2">
+            <x-button variant="danger" href="{{ route('identity.settings.index') }}">Batal</x-button>
             <x-button variant="primary" type="submit">Simpan</x-button>
         </div>
     </form>

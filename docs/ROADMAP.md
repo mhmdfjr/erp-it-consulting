@@ -3,7 +3,7 @@
 ## Sistem ERP - Perusahaan IT Service & Consulting
 
 Status: Draft v1.0
-Terakhir diperbarui: 2026-07-30
+Terakhir diperbarui: 2026-08-03 (revisi M2)
 
 ---
 
@@ -72,14 +72,17 @@ Roadmap ini tidak menyertakan estimasi durasi kalender (minggu/bulan). Tim devel
 **Deliverables:**
 
 - Product/Service Catalog: CRUD item dengan `item_type` (physical_good/service).
-- Inventory: `InventoryService` dengan stock level tracking single-location, stock movement log, manual stock adjustment dengan reason code wajib.
-- Sales Order: create, list, detail, linear flow tanpa approval gate sesuai PRD.
-- Invoice generation otomatis saat Sales Order di-complete, terhubung ke Finance lewat event `SalesOrderCompleted` (mengisi listener skeleton dari M1 dengan logic nyata).
+- Inventory: `InventoryService` dengan stock level tracking single-location, stock movement log, manual stock adjustment dengan reason code wajib, dan `releaseReservedStock()` untuk melepas reservasi (dipakai Cancel Order).
+- Sales Order: create, list, detail, linear flow tanpa approval gate sesuai PRD. Mendukung campuran item `physical_good` dan `service` dalam satu order.
+- **Cancel Order**: pembatalan Sales Order untuk status `draft` dengan alasan wajib, melepas stock reservation terkait (lihat PRD.md Section 4.4, DATABASE.md ASUMSI 8).
+- Invoice generation **sync** di dalam `SalesOrderService::completeOrder()` (bukan di listener), terhubung ke Finance lewat event `SalesOrderCompleted` yang mengisi listener skeleton dari M1 dengan logic pembuatan `journal_entries` (mengacu invoice yang sudah ada), termasuk grouping per `item_type` untuk order campuran (lihat ARCHITECTURE.md Section 4, DATABASE.md Appendix C).
+- Migration dan Model `Invoice`/`Payment` ditempatkan di module Finance (lihat DATABASE.md Section 3.6-3.7), bukan SalesInventory.
 - Payment recording terhadap invoice (AR minimal).
+- Extract shared trait `GeneratesSequentialNumber` (lihat ARCHITECTURE.md Section 4a), dipakai untuk `order_number`, `invoice_number`, dan refactor `entry_number` dari M1 supaya format nomor konsisten di seluruh sistem.
 
-**Exit criteria:** user bisa buat sales order dari awal sampai invoice terbit, stok berkurang otomatis untuk item fisik, dan journal entry pendapatan+piutang muncul otomatis di Finance module tanpa input manual.
+**Exit criteria:** user bisa buat sales order dari awal sampai invoice terbit, stok berkurang otomatis untuk item fisik, journal entry pendapatan+piutang (dan HPP untuk barang fisik) muncul otomatis di Finance module tanpa input manual dengan alokasi akun yang benar untuk order campuran barang+jasa, dan cancel order melepas stock reservation dengan benar tanpa meninggalkan stok terkunci permanen untuk order yang dibatalkan.
 
-**Risk yang perlu dipantau:** ini milestone pertama yang benar-benar menguji domain event flow lintas module secara end-to-end. Kalau ada masalah arsitektural di pattern event/listener, ini titik pertama kelihatan, jangan diabaikan dan buru-buru lanjut ke milestone berikutnya kalau masih ada kejanggalan di sini.
+**Risk yang perlu dipantau:** ini milestone pertama yang benar-benar menguji domain event flow lintas module secara end-to-end. Kalau ada masalah arsitektural di pattern event/listener, ini titik pertama kelihatan, jangan diabaikan dan buru-buru lanjut ke milestone berikutnya kalau masih ada kejanggalan di sini. Refactor `JournalEntryService` untuk shared number generator menyentuh kode M1 yang sudah production-tested — wajib re-run test M1 penuh sebelum lanjut, supaya regresi (kalau ada) langsung ketahuan sumbernya.
 
 ## 6. M3 - HR & Payroll
 

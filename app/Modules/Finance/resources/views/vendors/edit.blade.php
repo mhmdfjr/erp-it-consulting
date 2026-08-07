@@ -5,7 +5,7 @@
         @csrf @method('PUT')
         @include('finance::vendors.partials.form', ['vendor' => $vendor])
         <div class="flex justify-end gap-3 mt-6">
-            <x-button variant="secondary" href="{{ route('finance.vendors.index') }}">Batal</x-button>
+            <x-button variant="danger" href="{{ route('finance.vendors.index') }}">Batal</x-button>
             <x-button variant="primary" type="submit">Perbarui</x-button>
         </div>
     </form>

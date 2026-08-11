@@ -3,7 +3,7 @@
 ## Sistem ERP - Perusahaan IT Service & Consulting
 
 Status: Draft v1.0
-Terakhir diperbarui: 2026-08-03 (revisi M2)
+Terakhir diperbarui: 2026-08-09 (revisi M3 planning)
 
 ---
 
@@ -241,6 +241,17 @@ sales.inventory.adjust
 
 **Catatan**: rate BPJS Kesehatan, JHT, JP, JKM sudah tersedia di DATABASE.md Appendix B. VERIFIKASI 2 (kelas risiko JKK, wage cap JP) tetap perlu diselesaikan sebelum M3 dianggap final, tapi tidak menghalangi mulai task di bawah.
 
+**Keputusan planning M3 yang diambil sebelum mulai coding** (lihat riwayat chat sesi ini untuk reasoning lengkap, sudah diterapkan ke DATABASE.md Section 2.8/2.8a dan Appendix C, ARCHITECTURE.md Section 4/5, PRD.md, ROADMAP.md):
+
+- **Prorate base salary berbasis attendance**: dipicu **hanya** oleh `status = 'absent'` (tanpa keterangan). `leave` dan `sick` dihitung penuh, tidak memotong. Hari kerja pakai weekday (Senin-Jumat), libur nasional diabaikan di MVP (tidak ada tabel calendar/holiday). Formula: `base_salary_prorated = employees.base_salary × (hari_kerja - hari_absent) / hari_kerja`. Ini membalik ASUMSI 1 versi sebelumnya (full month tanpa prorate) — perlakukan sebagai keputusan final baru.
+- **Tunjangan (earning component) dibayar flat**, tidak ikut prorate. `percentage_of_base` di `employee_payroll_components` dihitung dari `employees.base_salary` kontraktual (fixed), bukan dari nilai yang sudah prorated.
+- **BPJS dan PPh21 dihitung dari gross salary yang basisnya sudah termasuk prorate** (bukan gross penuh dengan potongan absent ditambahkan belakangan di net) — supaya akurat terhadap penghasilan yang benar-benar diterima di periode itu.
+- **Attendance completeness check**: kalau jumlah row `attendances` employee di periode itu kurang dari hari kerja bulan tersebut, tampilkan warning sebelum payroll diproses (tidak block keras). Kalau user memaksa lanjut, hari kosong dianggap `present`.
+- **PPh21 dibulatkan round half up** ke rupiah penuh.
+- **Journal entry payroll: satu JE agregat per `payroll_period`** (bukan per employee/`payroll_run`), accrual basis (kredit 202 Utang Gaji, bukan langsung kas). BPJS di kredit 204/205 harus gabungan employee portion + company portion, bukan cuma employee portion dari `payroll_runs`.
+- **Pelunasan net pay ke karyawan** adalah aksi UI terpisah ("Mark as Paid", toggle `payroll_runs.status` jadi `paid`), mirror pola `VendorBill` M1 — tidak fire event baru, tidak generate jurnal tambahan di MVP.
+- Kolom baru `payroll_runs.working_days` dan `payroll_runs.absent_days` ditambahkan (di luar skema M3 awal) untuk audit trail prorate, supaya slip gaji bisa menjelaskan kenapa base salary beda dari kontrak tanpa perlu query ulang `attendances`.
+
 ### Struktur Module
 
 - [ ] 3.1 Buat struktur folder `app/Modules/HR` sama seperti pattern module sebelumnya.
@@ -253,8 +264,8 @@ sales.inventory.adjust
 - [ ] 3.5 Migration `payroll_components`, `employee_payroll_components` sesuai DATABASE.md Section 2.5.
 - [ ] 3.6 Migration `bpjs_rates` sesuai DATABASE.md Section 2.6.
 - [ ] 3.7 Migration `ter_categories`, `ptkp_ter_mapping`, `ter_rates` sesuai DATABASE.md Section 2.7.
-- [ ] 3.8 Migration `payroll_periods`, `payroll_runs`, `payroll_run_items` sesuai DATABASE.md Section 2.8.
-- [ ] 3.9 Model untuk seluruh tabel di atas dengan relasi yang sesuai.
+- [ ] 3.8 Migration `payroll_periods`, `payroll_runs`, `payroll_run_items` sesuai DATABASE.md Section 2.8, **termasuk kolom `working_days` dan `absent_days` di `payroll_runs`** (keputusan M3 planning, lihat catatan di atas dan DATABASE.md Section 2.8a) — bukan cuma kolom yang ada di draft skema awal.
+- [ ] 3.9 Model untuk seluruh tabel di atas dengan relasi yang sesuai. Ingat pola dua-lapis factory override (`newFactory()` di model + `$model` eksplisit di factory class) kalau model butuh factory untuk test, sesuai ARCHITECTURE.md Section 3b.
 
 ### Seed Data
 
@@ -264,34 +275,40 @@ sales.inventory.adjust
 
 ### Service Layer
 
-- [ ] 3.13 `PayrollService::calculateGrossSalary(Employee $employee)`: jumlahkan base salary + seluruh `employee_payroll_components` bertipe earning yang aktif.
-- [ ] 3.14 `PayrollService::calculateBpjsDeductions(Employee $employee, float $grossSalary)`: hitung potongan berdasarkan `bpjs_rates` yang berlaku (`effective_date` terbaru yang belum `end_date`). Terapkan `max_wage_base` sebagai cap: kalau `grossSalary > max_wage_base` (berlaku untuk BPJS Kesehatan), pakai `max_wage_base` sebagai dasar perhitungan, bukan `grossSalary` aktual.
-- [ ] 3.15 `PayrollService::calculatePph21(Employee $employee, float $grossSalary)`: lookup `ptkp_ter_mapping` berdasarkan `employee->ptkp_status`, cari `ter_category_id`, query `ter_rates` untuk bracket yang sesuai `income_lower_bound <= $grossSalary <= income_upper_bound` (atau `income_upper_bound IS NULL` untuk bracket teratas), kalikan rate dengan gross salary.
-- [ ] 3.16 `PayrollService::processPayrollRun(PayrollPeriod $period)`: loop seluruh employee `employment_status = active`, hitung gross, BPJS, PPh21, net salary, simpan ke `payroll_runs` + `payroll_run_items` (breakdown per komponen), dalam satu DB transaction per employee.
-- [ ] 3.17 Setelah seluruh employee diproses, fire event `PayrollProcessed` dengan reference ke `payroll_period_id`.
+- [ ] 3.13 `PayrollService::calculateWorkingDays(int $year, int $month)`: hitung jumlah weekday (Senin-Jumat) dalam bulan tersebut. Method kecil dan murni (tanpa dependency ke Employee/database lain), gampang di-unit-test terpisah. Dipakai oleh 3.14 dan 3.16.
+- [ ] 3.14 `PayrollService::calculateProratedBaseSalary(Employee $employee, PayrollPeriod $period)`: turunkan `periode_awal`/`periode_akhir` dari `$period->period_month`/`$period->period_year` (`Carbon::create($year, $month, 1)->startOfMonth()`/`->endOfMonth()`, JANGAN asumsikan ada kolom tanggal tersimpan di `payroll_periods`, lihat DATABASE.md Section 2.8a). Hitung `hari_absent` (`count(attendances WHERE employee_id, status='absent', date BETWEEN periode_awal AND periode_akhir)`), pakai `calculateWorkingDays()` untuk `hari_kerja`, kembalikan `base_salary_prorated = employee->base_salary × (hari_kerja - hari_absent) / hari_kerja`. Kembalikan juga `hari_kerja` dan `hari_absent` (dibutuhkan buat isi `payroll_runs.working_days`/`absent_days` di task 3.18).
+- [ ] 3.15 `PayrollService::calculateGrossSalary(Employee $employee, float $baseSalaryProrated)`: jumlahkan `$baseSalaryProrated` + seluruh `employee_payroll_components` bertipe earning yang aktif (flat, tidak ikut prorate — `percentage_of_base` dihitung dari `employee->base_salary` kontraktual, **bukan** dari `$baseSalaryProrated`).
+- [ ] 3.16 `PayrollService::calculateBpjsDeductions(Employee $employee, float $grossSalary)`: hitung potongan **employee portion** berdasarkan `bpjs_rates` yang berlaku (`effective_date` terbaru yang belum `end_date` **relatif terhadap first day of period**, bukan `now()`). Terapkan `max_wage_base` sebagai cap: kalau `grossSalary > max_wage_base` (berlaku untuk BPJS Kesehatan), pakai `max_wage_base` sebagai dasar perhitungan, bukan `grossSalary` aktual. Method ini cuma kembalikan employee portion (dipakai mengurangi net salary) — company portion dihitung terpisah nanti di listener (task 3.25), bukan disimpan di `payroll_runs`.
+- [ ] 3.17 `PayrollService::calculatePph21(Employee $employee, float $grossSalary)`: lookup `ptkp_ter_mapping` berdasarkan `employee->ptkp_status`, cari `ter_category_id`, query `ter_rates` untuk bracket yang sesuai `income_lower_bound <= $grossSalary <= income_upper_bound` (atau `income_upper_bound IS NULL` untuk bracket teratas), kalikan rate dengan gross salary, **bulatkan round half up ke rupiah penuh**.
+- [ ] 3.18 `PayrollService::processPayrollRun(PayrollPeriod $period)`: sebelum loop, untuk tiap employee `employment_status = active` cek attendance completeness (`count(attendances) >= calculateWorkingDays()` untuk periode itu) — kalau ada yang kurang, kumpulkan daftar employee yang datanya belum lengkap dan kembalikan/lempar sebagai warning ke Controller (bukan langsung proses), supaya UI (task 3.24) bisa tampilkan konfirmasi sebelum lanjut. Terima parameter/flag eksplisit (misal `bool $forceIncomplete = false`) untuk kasus user memilih lanjut meski warning. Loop seluruh employee `employment_status = active`: hitung `base_salary_prorated` (3.14) → `gross_salary` (3.15) → BPJS employee portion (3.16) → PPh21 (3.17) → `net_salary`, simpan ke `payroll_runs` (termasuk `working_days`/`absent_days`) + `payroll_run_items` (breakdown per komponen, termasuk baris earning individual), dalam satu DB transaction per employee.
+- [ ] 3.19 Setelah seluruh employee diproses, fire event `PayrollProcessed` dengan payload cuma `payroll_period_id` (listener query semua `payroll_runs` milik period itu sendiri, lihat ARCHITECTURE.md Section 4/5).
 
 ### UI
 
-- [ ] 3.18 `DepartmentController`, `PositionController` + view: CRUD dasar.
-- [ ] 3.19 `EmployeeController` + view: CRUD dengan form termasuk field `ptkp_status` (dropdown TK0/TK1/K0/TK2/TK3/K1/K2/K3).
-- [ ] 3.20 `AttendanceController` + view: input kehadiran harian per employee.
-- [ ] 3.21 `PayrollComponentController` + view: CRUD komponen gaji, assignment ke employee.
-- [ ] 3.22 `PayrollRunController` + view: pilih/buat `payroll_periods`, tombol "Process Payroll" yang memanggil `PayrollService::processPayrollRun()`.
-- [ ] 3.23 View slip gaji per employee: breakdown earning, BPJS deduction, PPh21 deduction, net salary, menampilkan `ter_category_used` untuk audit trail.
+- [ ] 3.20 `DepartmentController`, `PositionController` + view: CRUD dasar.
+- [ ] 3.21 `EmployeeController` + view: CRUD dengan form termasuk field `ptkp_status` (dropdown TK0/TK1/K0/TK2/TK3/K1/K2/K3).
+- [ ] 3.22 `AttendanceController` + view: input kehadiran harian per employee, status `present`/`absent`/`leave`/`sick`.
+- [ ] 3.23 `PayrollComponentController` + view: CRUD komponen gaji, assignment ke employee.
+- [ ] 3.24 `PayrollRunController` + view: pilih/buat `payroll_periods`, tombol "Process Payroll" yang memanggil `PayrollService::processPayrollRun()`. **Wajib tampilkan warning attendance completeness** (dari task 3.18) sebelum submit final kalau ada employee dengan data attendance belum lengkap di periode itu — modal konfirmasi eksplisit sebelum lanjut dengan `forceIncomplete = true`, bukan silent default ke present. Tombol terpisah "Mark as Paid" per `payroll_run` (atau per period untuk seluruh employee sekaligus, pilih salah satu — kalau per period, pastikan idempotent dan tidak menimpa `payroll_run` yang sudah `paid` sebelumnya) yang toggle `status` jadi `paid`, **tidak** memanggil `JournalEntryService` (tidak ada jurnal tambahan, cuma toggle status).
+- [ ] 3.25 View slip gaji per employee: breakdown base salary (tampilkan info prorate — `working_days`/`absent_days` dan nilai sebelum/sesudah prorate kalau ada potongan absent), earning, BPJS deduction, PPh21 deduction, net salary, menampilkan `ter_category_used` untuk audit trail.
 
 ### Integrasi ke Finance
 
-- [ ] 3.24 Isi logic nyata di `CreateJournalEntryFromPayroll::handle()` (listener dari M1 task 1.15): generate `journal_entries` (debit beban gaji, kredit utang BPJS, kredit utang PPh21, kredit kas/bank untuk net pay) lewat `JournalEntryService`.
+- [ ] 3.26 Isi logic nyata di `CreateJournalEntryFromPayroll::handle()` (listener dari M1 task 1.15): terima `payroll_period_id` dari payload event, query seluruh `payroll_runs` milik period tersebut, sum per kolom (`gross_salary`, `net_salary`, `pph21_deduction`, BPJS employee portion per jenis). **Hitung ulang BPJS company portion** dari `bpjs_rates.rate_company_percentage` (rate yang berlaku di first day of period, sama seperti task 3.16) dikalikan gross salary tiap employee (dengan cap `max_wage_base` yang sama), jumlahkan lintas employee. Bangun **satu** journal entry sesuai mapping DATABASE.md Appendix C: debit 511 (total gross), debit 512 (BPJS Kesehatan company portion), debit 513 (BPJS Ketenagakerjaan company portion, gabungan JHT+JKK+JKM+JP), kredit 202 (total net salary), kredit 203 (total PPh21), kredit 204 (BPJS Kesehatan employee+company portion digabung), kredit 205 (BPJS Ketenagakerjaan employee+company portion digabung). Panggil `JournalEntryService::createEntry()` dengan seluruh baris ini sekaligus, `reference_type = 'PayrollPeriod'`, `reference_id = payroll_period_id`.
 
 ### Test M3 (Wajib, Bukan Opsional)
 
-- [ ] 3.25 Unit test `PayrollService::calculatePph21()` dengan minimal 3-5 skenario penghasilan berbeda per kategori TER (A/B/C), hasil dibandingkan manual terhadap kalkulator resmi DJP. **Jangan lanjut ke task berikutnya kalau ada selisih angka yang tidak bisa dijelaskan.**
-- [ ] 3.26 Unit test `PayrollService::calculateBpjsDeductions()` dengan skenario gross salary berbeda (termasuk skenario di atas `max_wage_base` untuk memastikan cap diterapkan benar), verifikasi terhadap rate resmi di DATABASE.md Appendix B.
-- [ ] 3.27 Feature test end-to-end: process payroll run untuk beberapa employee sekaligus, assert `payroll_runs` dan `journal_entries` terbentuk dengan angka yang konsisten (total debit = total credit).
+- [ ] 3.27 Unit test `PayrollService::calculateWorkingDays()`: verifikasi jumlah weekday benar untuk beberapa bulan berbeda (termasuk bulan dengan jumlah hari ganjil/genap, tahun kabisat kalau relevan untuk Februari).
+- [ ] 3.28 Unit test `PayrollService::calculateProratedBaseSalary()`: skenario tanpa absent (hasil = base_salary penuh), skenario dengan beberapa hari absent (hasil terpotong proporsional), skenario `leave`/`sick` tidak memotong (assert eksplisit beda dari `absent`).
+- [ ] 3.29 Unit test `PayrollService::calculatePph21()` dengan minimal 3-5 skenario penghasilan berbeda per kategori TER (A/B/C), hasil dibandingkan manual terhadap kalkulator resmi DJP, verifikasi pembulatan round half up diterapkan benar. **Jangan lanjut ke task berikutnya kalau ada selisih angka yang tidak bisa dijelaskan.**
+- [ ] 3.30 Unit test `PayrollService::calculateBpjsDeductions()` dengan skenario gross salary berbeda (termasuk skenario di atas `max_wage_base` untuk memastikan cap diterapkan benar), verifikasi terhadap rate resmi di DATABASE.md Appendix B.
+- [ ] 3.31 Feature test end-to-end: process payroll run untuk beberapa employee sekaligus (termasuk minimal satu employee dengan hari absent supaya prorate teruji, bukan cuma skenario full attendance), assert `payroll_runs` (termasuk `working_days`/`absent_days`) dan **satu** `journal_entries` agregat terbentuk dengan angka yang konsisten (total debit = total credit, DAN assert nilai per akun individual — khususnya 204/205 harus mengandung employee+company portion, bukan cuma employee portion — supaya bug seperti M2 grouping per `item_type` tidak lolos tak terdeteksi cuma karena total balance).
+- [ ] 3.32 Feature test: attendance completeness — assert warning muncul/dilempar kalau ada employee dengan attendance kurang dari hari kerja bulan itu, assert `processPayrollRun()` tetap bisa jalan dengan `forceIncomplete = true` dan hari kosong dianggap `present`.
+- [ ] 3.33 Feature test: "Mark as Paid" — assert toggle status jadi `paid`, assert **tidak ada** `journal_entries` baru yang dibuat dari aksi ini.
 
 ### Review Exit Criteria M3
 
-- [ ] 3.28 Verifikasi terhadap ROADMAP.md M3: payroll run bisa diproses, PPh21 tervalidasi terhadap sumber resmi, integrasi ke Finance otomatis.
+- [ ] 3.34 Verifikasi terhadap ROADMAP.md M3: payroll run bisa diproses dengan prorate attendance diterapkan benar, PPh21 tervalidasi terhadap sumber resmi (termasuk pembulatan), integrasi ke Finance otomatis menghasilkan satu journal entry agregat per period dengan alokasi akun BPJS employee+company yang benar, Mark as Paid berfungsi tanpa jurnal tambahan.
 
 ---
 

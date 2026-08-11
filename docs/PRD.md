@@ -3,7 +3,7 @@
 ## Sistem ERP - Perusahaan IT Service & Consulting
 
 Status: Draft v1.0
-Terakhir diperbarui: 2026-08-03 (revisi M2)
+Terakhir diperbarui: 2026-08-09 (revisi M3 planning)
 
 ---
 
@@ -82,14 +82,15 @@ Fungsi cross-cutting yang dipakai seluruh module lain, bukan module bisnis yang 
 **Functional requirements:**
 
 - Employee master data: data pribadi, jabatan, tanggal bergabung, status kepegawaian.
-- Attendance tracking: pencatatan kehadiran harian (manual input atau check-in/out sederhana).
+- Attendance tracking: pencatatan kehadiran harian (manual input atau check-in/out sederhana), status `present`/`absent`/`leave`/`sick`.
 - Payroll processing:
     - Komponen gaji dikonfigurasi: base salary, tunjangan tetap, potongan tetap.
-    - BPJS Kesehatan dan BPJS Ketenagakerjaan dihitung dengan rate yang dikonfigurasi (bukan hardcode).
-    - PPh21 monthly withholding dihitung otomatis memakai skema **TER**, berdasarkan penghasilan bruto bulanan dan PTKP status employee yang bersangkutan. Tabel TER dan mapping PTKP-ke-kategori TER disimpan sebagai reference data yang dapat diperbarui tanpa deploy ulang kode.
+    - **Prorate berbasis attendance (keputusan M3)**: base salary dipotong proporsional kalau ada hari `absent` tanpa keterangan dalam periode berjalan (rumus: `base_salary × (hari_kerja - hari_absent) / hari_kerja`, hari kerja = weekday, libur nasional diabaikan di MVP). `leave` dan `sick` tidak memotong. Tunjangan (earning component) dibayar flat, tidak ikut prorate. Detail formula di DATABASE.md Section 2.8a. Kalau data attendance periode berjalan belum lengkap saat payroll diproses, sistem beri warning (tidak block), default hari kosong dianggap `present` kalau user memaksa lanjut.
+    - BPJS Kesehatan dan BPJS Ketenagakerjaan dihitung dengan rate yang dikonfigurasi (bukan hardcode), dari gross salary yang basisnya sudah termasuk prorate di atas.
+    - PPh21 monthly withholding dihitung otomatis memakai skema **TER**, berdasarkan penghasilan bruto bulanan (setelah prorate) dan PTKP status employee yang bersangkutan. Tabel TER dan mapping PTKP-ke-kategori TER disimpan sebagai reference data yang dapat diperbarui tanpa deploy ulang kode. Hasil kalkulasi dibulatkan round half up ke rupiah penuh.
     - **Annual reconciliation PPh21 (rekonsiliasi Desember dengan tarif progresif) tidak termasuk MVP.** Sistem hanya menghasilkan potongan bulanan sesuai TER, tanpa penyesuaian akhir tahun.
-    - Generate slip gaji bulanan per employee, menampilkan breakdown base salary, tunjangan, potongan BPJS, dan potongan PPh21.
-    - Payroll run terhubung ke Finance module lewat domain event untuk membuat journal entry beban gaji dan liability (utang PPh21 ke kas negara, utang BPJS).
+    - Generate slip gaji bulanan per employee, menampilkan breakdown base salary (termasuk info prorate kalau ada), tunjangan, potongan BPJS, dan potongan PPh21.
+    - Payroll run terhubung ke Finance module lewat domain event (`PayrollProcessed`, dipicu sekali per period, bukan per employee) untuk membuat **satu** journal entry agregat: beban gaji, beban BPJS perusahaan, dan liability (utang gaji, utang PPh21, utang BPJS gabungan employee+company). Jurnal ini accrual — pelunasan net pay ke karyawan adalah aksi UI terpisah ("Mark as Paid") yang tidak menghasilkan jurnal tambahan di MVP, mirror pola Vendor Bill.
 
 **Data requirements:**
 
@@ -159,7 +160,7 @@ Status per item, sudah banyak yang terjawab sejak draft awal:
 
 - ~~Struktur CoA final belum ditentukan~~ **Terjawab**: seed data awal sudah ada di DATABASE.md Appendix C, diadaptasi dari referensi CoA perusahaan jasa. Bukan hasil audit akuntan, tetap perlu direview sebelum go-live produksi.
 - ~~Definisi "stock adjustment manual"~~ **Terjawab**: `reason_code` wajib diisi untuk stock adjustment, lihat DATABASE.md Assumption 3 dan Section 4.5.
-- **Masih asumsi, belum dikonfirmasi eksplisit**: payroll run diasumsikan selalu full month, tanpa prorate otomatis untuk karyawan baru/resign di tengah bulan (lihat DATABASE.md Assumption 1). Kalau ternyata butuh prorate, ini perubahan di business logic, bukan schema, tapi tetap perlu keputusan eksplisit sebelum M3 (lihat ROADMAP.md).
+- ~~Payroll prorate~~ **Terjawab (M3 planning)**: bukan full month tanpa syarat. Base salary di-prorate proporsional terhadap kehadiran, tapi cuma dipicu `absent` tanpa keterangan (`leave`/`sick` dihitung penuh). Tunjangan (`employee_payroll_components` earning) dibayar flat, tidak ikut prorate. Hari kerja pakai weekday standar, libur nasional diabaikan di MVP. Detail formula di DATABASE.md Section 2.8a. Ini tidak menjawab kasus karyawan baru join/resign di tengah bulan secara eksplisit (prorate di sini murni berbasis attendance harian, bukan berbasis tanggal `hire_date`/`termination_date` terhadap awal/akhir periode) — kalau ada kebutuhan prorate khusus untuk mid-month join/resign, itu perlu ditinjau terpisah, belum tercakup keputusan ini.
 - ~~Sumber tabel TER~~ **Terjawab**: data resmi PMK 168/2023 sudah diseed di DATABASE.md Appendix A.
 - **Masih terbuka**: proses onboarding PTKP status karyawan baru, apakah diinput manual oleh HR admin saat create employee atau perlu dokumen pendukung (NPWP, kartu keluarga) yang di-attach sebagai bukti. Field requirement di employee master data saat ini cuma menyimpan status-nya (`ptkp_status`), belum ada mekanisme dokumen pendukung.
 - **Baru muncul, masih terbuka**: dua angka rate BPJS spesifik untuk perusahaan ini belum dikonfirmasi resmi ke BPJS Ketenagakerjaan: kelas risiko JKK (dipakai asumsi kelas terendah 0.24% sementara) dan batas atas upah (wage cap) untuk JP tahun 2026 kalau memang ada. Detail di DATABASE.md Appendix B, tracking task ada di TASKS.md bagian "Item yang Masih Perlu Diverifikasi".

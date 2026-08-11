@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Tambah Item</x-slot>
+    <x-slot name="header">Edit Item</x-slot>
 
     <form method="POST" action="{{ route('sales.items.update', $item) }}" x-data="{ itemType: 'physical_good' }" class="max-w-xl space-y-4">
         @csrf

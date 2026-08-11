@@ -4,7 +4,7 @@
 
 Status: Draft v1.0
 Database: PostgreSQL
-Terakhir diperbarui: 2026-08-03 (revisi M2)
+Terakhir diperbarui: 2026-08-09 (revisi M3 planning)
 
 ---
 
@@ -12,8 +12,15 @@ Terakhir diperbarui: 2026-08-03 (revisi M2)
 
 Dua open question dari PRD.md belum terjawab final. Schema di bawah dibuat dengan asumsi berikut, ditandai supaya mudah direvisi:
 
-- **ASUMSI 1 - Payroll prorate**: payroll run diasumsikan **full month**, tidak ada prorate otomatis untuk karyawan yang baru join atau resign di tengah bulan. Kalau nanti butuh prorate, perubahan terjadi di level business logic (service layer), bukan di schema, karena `payroll_runs` sudah menyimpan `period_start`/`period_end` yang bisa dipakai untuk hitung prorate kapan saja.
-- **ASUMSI 2 - Tabel TER**: **sudah tidak lagi asumsi**, data resmi TER Bulanan (kategori A/B/C) berdasarkan PMK 168/2023 sudah tersedia dan dimasukkan sebagai seed data di Appendix A. TER Harian untuk pegawai tidak tetap **resmi di luar scope MVP**, didefer ke fase 2 (lihat Section 2.9). Schema saat ini hanya mendukung employee dengan skema penggajian bulanan (TER Bulanan).
+- **ASUMSI 1 - Payroll prorate**: **sudah diputuskan** (M3 planning). Payroll run **tidak** full month tanpa syarat — base salary di-prorate berdasarkan kehadiran, tapi cuma dipicu oleh `absent` tanpa keterangan, bukan oleh seluruh kategori attendance. Detail lengkap dan formula ada di Section 2.8a. Ringkasan keputusan:
+    - Basis hari kerja: weekday (Senin-Jumat) dalam bulan berjalan, libur nasional **diabaikan** di MVP (tidak ada tabel calendar/holiday).
+    - Yang memicu potongan proporsional: **hanya** `status = 'absent'`. Status `leave`/`sick`/`present` dihitung penuh, tidak mengurangi rasio kehadiran.
+    - Yang di-prorate: **hanya** `base_salary`. Seluruh `employee_payroll_components` bertipe earning (tunjangan) dibayar **flat**, tidak ikut prorate — keputusan sadar untuk menyederhanakan implementasi, meski secara teori sebagian tunjangan (misal transport) idealnya juga proporsional terhadap kehadiran.
+    - `percentage_of_base` pada `employee_payroll_components` dihitung dari `employees` base salary **kontraktual** (fixed, sebelum prorate), bukan dari `base_salary_prorated` — konsisten dengan keputusan tunjangan flat di atas.
+    - BPJS dan PPh21 dihitung dari `gross_salary` yang basisnya **sudah** memasukkan `base_salary_prorated` (bukan dari gross penuh tanpa prorate). Ini penting: kalau prorate cuma diterapkan di akhir sebagai potongan net_salary, PPh21/BPJS akan dihitung dari penghasilan yang tidak mencerminkan yang benar-benar diterima karyawan di periode itu, tidak akurat secara pajak.
+    - Kalau data `attendances` untuk employee di periode tersebut belum lengkap (jumlah row lebih sedikit dari hari kerja bulan itu) saat `processPayrollRun()` dijalankan, sistem **warning** ke user (bukan block keras) sebelum diproses; kalau user tetap lanjut, hari yang tidak punya record dianggap `present` (tidak menambah hitungan absent).
+    - Perubahan ini **membalik** posisi versi sebelumnya yang bilang "full month, tidak ada prorate" — perlu diperlakukan sebagai keputusan final baru, bukan revisi kecil.
+- **ASUMSI 2 - Tabel TER**: **sudah tidak lagi asumsi**, data resmi TER Bulanan (kategori A/B/C) berdasarkan PMK 168/2023 sudah tersedia dan dimasukkan sebagai seed data di Appendix A. TER Harian untuk pegawai tidak tetap **resmi di luar scope MVP**, didefer ke fase 2 (lihat Section 2.9). Schema saat ini hanya mendukung employee dengan skema penggajian bulanan (TER Bulanan). **Pembulatan (M3 planning)**: hasil `rate_percentage × gross_salary` dibulatkan **round half up** ke rupiah penuh (bukan floor, bukan pembulatan ke ribuan). Diterapkan di `PayrollService::calculatePph21()`, wajib dicek ulang terhadap kalkulator resmi DJP saat task 3.25 dijalankan — kalau ada selisih sistematis, arah pembulatan ini yang pertama dicurigai, bukan formula TER-nya.
 - **ASUMSI 3 - Stock adjustment**: `stock_movements` mewajibkan `reason_code` untuk movement bertipe `adjustment`, supaya ada jejak kenapa stok berubah di luar transaksi sales. Kalau ternyata tidak perlu reason code wajib, tinggal ubah constraint `NOT NULL` jadi nullable, tidak perlu migrasi struktural.
 - **ASUMSI 4 - Chart of Accounts**: seed data awal sudah tersedia di Appendix C, diadaptasi dari referensi CoA perusahaan jasa dan disesuaikan untuk bisnis campuran jasa+barang teknologi. Ini bukan hasil audit akuntan, tetap perlu direview sebelum go-live produksi (lihat catatan di Appendix C).
 - **ASUMSI 6 - Ownership tabel `invoices`/`payments`**: **sudah diputuskan** (M2), migration dan Model kedua tabel ini tinggal di module **Finance**, bukan `SalesInventory`, meski trigger pembuatannya berasal dari flow Sales Order. Alasan: ownership data ditentukan oleh siapa yang mendefinisikan lifecycle dan invariant-nya (status unpaid/paid/void, relasi ke `journal_entries`), bukan oleh siapa yang memicunya — sama seperti `journal_entries` sendiri tidak ditaruh di SalesInventory meski dipicu event dari sana. Lihat Section 3.6/3.7 untuk detail.
@@ -124,29 +131,30 @@ Index: composite `(auditable_type, auditable_id)` untuk query riwayat perubahan 
 
 ### 2.3 `employees`
 
-| Column              | Type         | Constraint                   | Keterangan                                                                                  |
-| ------------------- | ------------ | ---------------------------- | ------------------------------------------------------------------------------------------- |
-| id                  | bigserial    | PK                           |                                                                                             |
-| user_id             | bigint       | FK -> users.id, NULL         | nullable, tidak semua employee punya login                                                  |
-| employee_code       | varchar(50)  | UNIQUE, NOT NULL             |                                                                                             |
-| full_name           | varchar(255) | NOT NULL                     |                                                                                             |
-| nik                 | varchar(20)  | NULL                         | KTP number                                                                                  |
-| npwp                | varchar(20)  | NULL                         |                                                                                             |
-| gender              | varchar(10)  | NOT NULL                     |                                                                                             |
-| birth_date          | date         | NOT NULL                     |                                                                                             |
-| ptkp_status         | varchar(10)  | NOT NULL                     | enum: TK0, TK1, TK2, TK3, K0, K1, K2, K3                                                    |
-| position_id         | bigint       | FK -> positions.id, NOT NULL |                                                                                             |
-| hire_date           | date         | NOT NULL                     |                                                                                             |
-| termination_date    | date         | NULL                         |                                                                                             |
-| employment_status   | varchar(20)  | NOT NULL, DEFAULT 'active'   | enum: active, resigned, terminated                                                          |
-| bank_name           | varchar(100) | NULL                         |                                                                                             |
-| bank_account_number | varchar(50)  | NULL                         |                                                                                             |
-| address             | text         | NULL                         |                                                                                             |
-| phone               | varchar(50)  | NULL                         |                                                                                             |
-| email               | varchar(255) | NULL                         |                                                                                             |
-| created_at          | timestamptz  | NOT NULL                     |                                                                                             |
-| updated_at          | timestamptz  | NOT NULL                     |                                                                                             |
-| deleted_at          | timestamptz  | NULL                         | soft delete, employee resign tidak boleh hard delete karena riwayat payroll harus tetap ada |
+| Column              | Type          | Constraint                   | Keterangan                                                                                                                                                                                                                                                                                                                                      |
+| ------------------- | ------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id                  | bigserial     | PK                           |                                                                                                                                                                                                                                                                                                                                                 |
+| user_id             | bigint        | FK -> users.id, NULL         | nullable, tidak semua employee punya login                                                                                                                                                                                                                                                                                                      |
+| employee_code       | varchar(50)   | UNIQUE, NOT NULL             |                                                                                                                                                                                                                                                                                                                                                 |
+| full_name           | varchar(255)  | NOT NULL                     |                                                                                                                                                                                                                                                                                                                                                 |
+| nik                 | varchar(20)   | NULL                         | KTP number                                                                                                                                                                                                                                                                                                                                      |
+| npwp                | varchar(20)   | NULL                         |                                                                                                                                                                                                                                                                                                                                                 |
+| gender              | varchar(10)   | NOT NULL                     |                                                                                                                                                                                                                                                                                                                                                 |
+| birth_date          | date          | NOT NULL                     |                                                                                                                                                                                                                                                                                                                                                 |
+| ptkp_status         | varchar(10)   | NOT NULL                     | enum: TK0, TK1, TK2, TK3, K0, K1, K2, K3                                                                                                                                                                                                                                                                                                        |
+| position_id         | bigint        | FK -> positions.id, NOT NULL |                                                                                                                                                                                                                                                                                                                                                 |
+| base_salary         | numeric(15,2) | NOT NULL                     | base salary kontraktual (fixed), basis untuk prorate (Section 2.8a) dan basis `percentage_of_base` di `employee_payroll_components` — **ditambahkan saat implementasi M3** (tidak ada di draft skema awal, gap ditemukan saat menulis `PayrollService::calculateProratedBaseSalary()`), migration terpisah `add_base_salary_to_employees_table` |
+| hire_date           | date          | NOT NULL                     |                                                                                                                                                                                                                                                                                                                                                 |
+| termination_date    | date          | NULL                         |                                                                                                                                                                                                                                                                                                                                                 |
+| employment_status   | varchar(20)   | NOT NULL, DEFAULT 'active'   | enum: active, resigned, terminated                                                                                                                                                                                                                                                                                                              |
+| bank_name           | varchar(100)  | NULL                         |                                                                                                                                                                                                                                                                                                                                                 |
+| bank_account_number | varchar(50)   | NULL                         |                                                                                                                                                                                                                                                                                                                                                 |
+| address             | text          | NULL                         |                                                                                                                                                                                                                                                                                                                                                 |
+| phone               | varchar(50)   | NULL                         |                                                                                                                                                                                                                                                                                                                                                 |
+| email               | varchar(255)  | NULL                         |                                                                                                                                                                                                                                                                                                                                                 |
+| created_at          | timestamptz   | NOT NULL                     |                                                                                                                                                                                                                                                                                                                                                 |
+| updated_at          | timestamptz   | NOT NULL                     |                                                                                                                                                                                                                                                                                                                                                 |
+| deleted_at          | timestamptz   | NULL                         | soft delete, employee resign tidak boleh hard delete karena riwayat payroll harus tetap ada                                                                                                                                                                                                                                                     |
 
 Index: `employee_code` (unique), `position_id`, `employment_status` (untuk filter employee aktif saat generate payroll run).
 
@@ -279,24 +287,62 @@ Index: composite unique `(period_month, period_year)`.
 
 **`payroll_runs`** - satu row per employee per period.
 
-| Column                   | Type          | Constraint                         | Keterangan                                     |
-| ------------------------ | ------------- | ---------------------------------- | ---------------------------------------------- |
-| id                       | bigserial     | PK                                 |                                                |
-| payroll_period_id        | bigint        | FK -> payroll_periods.id, NOT NULL |                                                |
-| employee_id              | bigint        | FK -> employees.id, NOT NULL       |                                                |
-| base_salary              | numeric(15,2) | NOT NULL                           |                                                |
-| gross_salary             | numeric(15,2) | NOT NULL                           | base + seluruh earning component               |
-| bpjs_kesehatan_deduction | numeric(15,2) | NOT NULL, DEFAULT 0                |                                                |
-| bpjs_jht_deduction       | numeric(15,2) | NOT NULL, DEFAULT 0                |                                                |
-| bpjs_jp_deduction        | numeric(15,2) | NOT NULL, DEFAULT 0                |                                                |
-| pph21_deduction          | numeric(15,2) | NOT NULL, DEFAULT 0                | hasil lookup TER                               |
-| ter_category_used        | varchar(5)    | NULL                               | audit trail kategori TER yang dipakai saat itu |
-| total_deduction          | numeric(15,2) | NOT NULL                           |                                                |
-| net_salary               | numeric(15,2) | NOT NULL                           |                                                |
-| status                   | varchar(20)   | NOT NULL, DEFAULT 'draft'          | enum: draft, finalized, paid                   |
-| created_at               | timestamptz   | NOT NULL                           |                                                |
+| Column                   | Type          | Constraint                         | Keterangan                                                                                                                                                                                                   |
+| ------------------------ | ------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| id                       | bigserial     | PK                                 |                                                                                                                                                                                                              |
+| payroll_period_id        | bigint        | FK -> payroll_periods.id, NOT NULL |                                                                                                                                                                                                              |
+| employee_id              | bigint        | FK -> employees.id, NOT NULL       |                                                                                                                                                                                                              |
+| working_days             | smallint      | NOT NULL                           | jumlah weekday (Senin-Jumat) dalam periode (libur nasional diabaikan, lihat Section 2.8a)                                                                                                                    |
+| absent_days              | smallint      | NOT NULL, DEFAULT 0                | jumlah hari `status = 'absent'` employee ini di periode tsb, dipakai untuk hitung prorate                                                                                                                    |
+| base_salary              | numeric(15,2) | NOT NULL                           | **nilai setelah prorate** (`employees.base_salary × rasio_kehadiran`), BUKAN base salary kontraktual mentah — lihat Section 2.8a                                                                             |
+| gross_salary             | numeric(15,2) | NOT NULL                           | `base_salary` (kolom di atas, sudah prorated) + seluruh earning component (flat, tidak ikut prorate)                                                                                                         |
+| bpjs_kesehatan_deduction | numeric(15,2) | NOT NULL, DEFAULT 0                |                                                                                                                                                                                                              |
+| bpjs_jht_deduction       | numeric(15,2) | NOT NULL, DEFAULT 0                |                                                                                                                                                                                                              |
+| bpjs_jp_deduction        | numeric(15,2) | NOT NULL, DEFAULT 0                |                                                                                                                                                                                                              |
+| pph21_deduction          | numeric(15,2) | NOT NULL, DEFAULT 0                | hasil lookup TER, dibulatkan round half up ke rupiah penuh                                                                                                                                                   |
+| ter_category_used        | varchar(5)    | NULL                               | audit trail kategori TER yang dipakai saat itu                                                                                                                                                               |
+| total_deduction          | numeric(15,2) | NOT NULL                           |                                                                                                                                                                                                              |
+| net_salary               | numeric(15,2) | NOT NULL                           |                                                                                                                                                                                                              |
+| status                   | varchar(20)   | NOT NULL, DEFAULT 'draft'          | enum: draft, finalized, paid. Transisi ke `paid` dipicu aksi eksplisit "Mark as Paid" (mirror `VendorBill`, lihat Section 3.5), BUKAN otomatis sama dengan `finalized` — lihat catatan accrual di Appendix C |
+| created_at               | timestamptz   | NOT NULL                           |                                                                                                                                                                                                              |
 
 Index: composite unique `(payroll_period_id, employee_id)`.
+
+### 2.8a Formula Prorate Berbasis Attendance (Keputusan M3)
+
+**Keputusan (M3 planning)**: base salary di-prorate berdasarkan attendance, tapi cuma dipicu `absent` tanpa keterangan. Ini keputusan final yang membalik ASUMSI 1 versi sebelumnya (full month tanpa prorate).
+
+**Catatan skema**: `payroll_periods` cuma menyimpan `period_month`/`period_year` (integer), **tidak ada** kolom tanggal (`period_start`/`period_end`) tersimpan eksplisit. Tanggal awal/akhir periode diturunkan on-the-fly di service layer (`Carbon::create($year, $month, 1)->startOfMonth()` dan `->endOfMonth()`), bukan disimpan sebagai kolom terpisah — hindari inkonsistensi kalau nanti ada yang menyimpan tanggal manual yang menyimpang dari `period_month`/`period_year`.
+
+```
+periode_awal      = tanggal 1 dari period_month/period_year
+periode_akhir     = tanggal terakhir dari period_month/period_year (endOfMonth)
+hari_kerja_bulan  = jumlah weekday (Senin-Jumat) antara periode_awal dan periode_akhir
+                     (libur nasional DIABAIKAN di MVP, tidak ada tabel holiday calendar)
+hari_absent       = count(attendances WHERE employee_id = X, status = 'absent',
+                           date BETWEEN periode_awal AND periode_akhir)
+hari_efektif      = hari_kerja_bulan - hari_absent
+rasio_kehadiran   = hari_efektif / hari_kerja_bulan
+
+base_salary_prorated = employees.base_salary × rasio_kehadiran      // DIPRORATE
+
+earning_total = SUM(employee_payroll_components WHERE type='earning', aktif)
+                // FLAT, tidak dikali rasio_kehadiran
+                // percentage_of_base dihitung dari employees.base_salary (kontraktual,
+                // fixed), BUKAN dari base_salary_prorated
+
+gross_salary    = base_salary_prorated + earning_total
+bpjs_deductions = dihitung dari gross_salary (basisnya sudah termasuk prorate),
+                  max_wage_base cap tetap berlaku sesuai Section 3.14/Appendix B
+pph21_deduction = TER lookup dari gross_salary, round half up ke rupiah penuh
+net_salary      = gross_salary - bpjs_deductions - pph21_deduction
+```
+
+Status attendance `leave` dan `sick` **tidak** mengurangi `hari_efektif` (dihitung sama seperti `present`), hanya `absent` yang memotong. Ini keputusan sadar untuk kesederhanaan MVP, bukan cerminan kebijakan cuti/sakit perusahaan yang sesungguhnya (yang biasanya juga membedakan cuti dengan/tanpa sisa kuota, dsb — di luar scope).
+
+**Attendance completeness check**: sebelum `PayrollService::processPayrollRun()` menghitung, sistem membandingkan jumlah row `attendances` employee tersebut di periode itu terhadap `hari_kerja_bulan`. Kalau kurang (belum lengkap), UI menampilkan **warning**, bukan block keras — user tetap bisa lanjut proses. Kalau dipaksa lanjut, hari yang tidak ada record dianggap `present` (tidak menambah `hari_absent`).
+
+Kolom `working_days`/`absent_days` di `payroll_runs` menyimpan angka final yang dipakai saat itu, supaya slip gaji dan audit bisa merekonstruksi kenapa `base_salary` berbeda dari kontrak tanpa perlu query ulang `attendances` (yang datanya bisa berubah/ditambah belakangan).
 
 **`payroll_run_items`** - breakdown detail per komponen, dipakai untuk render slip gaji.
 
@@ -878,7 +924,19 @@ Ini seed data awal yang wajar untuk mulai development, bukan hasil audit dari ak
 
     Tanpa grouping ini, jurnal tetap balance secara total debit=credit (`JournalEntryService::createEntry()` tidak menolaknya), tapi alokasi ke akun pendapatan 401 vs 402 bisa salah untuk order campuran — bug ini tidak terdeteksi otomatis dan baru kelihatan saat laporan laba rugi per akun sudah salah, jauh setelah entry di-posting (dan sudah immutable, koreksi cuma lewat void manual).
 
-- Payroll processed: debit 511 (Beban Gaji), debit 512/513 (Beban BPJS Perusahaan), kredit 202 (Utang Gaji) atau langsung kredit 101/102 kalau net pay langsung dibayar, kredit 203 (Utang PPh21), kredit 204/205 (Utang BPJS).
+- **Payroll processed (keputusan M3, sudah final, bukan lagi "atau")**: accrual, mirror pola `VendorBill` di M1 — jurnal dibuat **saat payroll diproses** (`PayrollProcessed`), bukan saat net pay ditransfer ke karyawan. Pelunasan ke karyawan adalah aksi terpisah ("Mark as Paid", lihat `payroll_runs.status` Section 2.8), tidak menghasilkan jurnal tambahan di MVP ini (net pay sudah dicatat sebagai liability di 202 saat processed, pelunasan cukup toggle status seperti `VendorBill`, konsisten dengan keputusan AP di Section 3.5 — beda dari AR/`payments` yang memang butuh payment detail terpisah).
+
+    **Satu Journal Entry agregat per `payroll_period`** (bukan satu JE per `payroll_run`/employee) — `reference_type = 'PayrollPeriod'`, `reference_id = payroll_period_id`. Listener `CreateJournalEntryFromPayroll::handle()` query seluruh `payroll_runs` milik period tersebut, jumlahkan per kolom, lalu bangun baris jurnal:
+    1. Debit 511 (Beban Gaji dan Tunjangan) = `SUM(payroll_runs.gross_salary)` seluruh employee di period tsb.
+    2. Debit 512 (Beban BPJS Kesehatan Perusahaan) = `SUM(gross_salary × bpjs_rates.rate_company_percentage untuk bpjs_type='kesehatan')`, dihitung ulang dari rate yang berlaku (bukan disimpan terpisah di `payroll_runs`, karena kolom yang ada cuma potongan sisi employee).
+    3. Debit 513 (Beban BPJS Ketenagakerjaan Perusahaan) = jumlah company portion JHT+JKK+JKM+JP seluruh employee.
+    4. Kredit 202 (Utang Gaji) = `SUM(payroll_runs.net_salary)` — net pay yang **belum** ditransfer ke karyawan (liability, bukan cash out langsung).
+    5. Kredit 203 (Utang PPh21) = `SUM(payroll_runs.pph21_deduction)`.
+    6. Kredit 204 (Utang BPJS Kesehatan) = employee portion (dari `payroll_runs.bpjs_kesehatan_deduction`) **+** company portion (baris debit 512) digabung — karena itu jumlah yang benar-benar disetor ke BPJS Kesehatan, bukan cuma potongan gaji karyawan.
+    7. Kredit 205 (Utang BPJS Ketenagakerjaan) = employee portion (JHT+JP dari `payroll_runs`) **+** company portion (baris debit 513) digabung, alasan sama seperti poin 6.
+
+    **Peringatan implementasi**: jangan langsung pakai `payroll_runs.bpjs_kesehatan_deduction`/`bpjs_jht_deduction`/`bpjs_jp_deduction` sebagai angka kredit ke 204/205 tanpa menambahkan company portion — kolom-kolom itu di `payroll_runs` cuma menyimpan potongan sisi employee (dipakai mengurangi `net_salary`), bukan total setoran ke BPJS. Company portion perlu dihitung ulang dari `bpjs_rates.rate_company_percentage` saat listener jalan (rate yang `effective_date`-nya berlaku di first day of period, sama seperti saat `PayrollService::calculateBpjsDeductions()` menghitungnya).
+
 - Vendor bill dibuat (M1, accrual basis): debit `vendor_bills.account_id` (akun beban/aset sesuai bill), kredit 201 (Utang Usaha) sebesar `amount`.
 - Vendor bill dibayar (status → paid): debit 201 (Utang Usaha), kredit 101/102 (Kas/Bank) sebesar `amount`.
 - **Invoice dibayar (keputusan M2, ditambal karena tidak eksplisit ada di spesifikasi awal task 2.23)**: debit 101/102 (Kas/Bank, dipilih dari `payment_method` — `cash` ke 101, selain itu default 102), kredit 103 (Piutang Usaha) sebesar `payment.amount`. Jurnal dibuat **per payment**, bukan cuma saat invoice full paid — beda dari vendor bill (AP) yang cuma toggle status tanpa payment detail terpisah (DATABASE.md Section 3.5), karena `payments` di sisi AR memang dirancang mendukung partial payment (Section 3.7), jadi tiap penerimaan kas perlu tercatat di tanggal transaksinya masing-masing untuk akurasi buku besar. **Asumsi belum dikonfirmasi**: pemilihan akun 101 vs 102 berdasarkan `payment_method`, perlu direview kalau perusahaan punya konvensi berbeda.

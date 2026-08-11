@@ -28,6 +28,5 @@ class FinanceServiceProvider extends ServiceProvider
 
         Event::listen(SalesOrderCompleted::class, CreateJournalEntryFromSalesOrder::class);
         Event::listen(PayrollProcessed::class, CreateJournalEntryFromPayroll::class);
-
     }
 }

@@ -54,7 +54,18 @@ class RolePermissionSeeder extends Seeder
         'sales.category.create',
 
         // HR & Payroll - placeholder, di-refine saat M3.
-        'hr.manage',
+        'hr.department.manage',
+        'hr.position.manage',
+        'hr.employee.view',
+        'hr.employee.create',
+        'hr.employee.update',
+        'hr.attendance.view',
+        'hr.attendance.manage',
+        'hr.payrollcomponent.view',
+        'hr.payrollcomponent.manage',
+        'hr.payroll.view',
+        'hr.payroll.process',
+        'hr.payroll.pay'
     ];
 
     public function run(): void

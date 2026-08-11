@@ -24,6 +24,15 @@
             ['label' => 'Pelanggan', 'route' => 'sales.customers.index', 'icon' => 'contact-round'],
             ['label' => 'Pesanan Penjualan', 'route' => 'sales.orders.index', 'icon' => 'shopping-cart'],
         ],
+
+        'HR & Payroll' => [
+            ['label' => 'Departemen', 'route' => 'hr.departments.index', 'icon' => 'blocks'],
+            ['label' => 'Jabatan', 'route' => 'hr.positions.index', 'icon' => 'briefcase'],
+            ['label' => 'Karyawan', 'route' => 'hr.employees.index', 'icon' => 'user-shield'],
+            ['label' => 'Absensi', 'route' => 'hr.attendances.index', 'icon' => 'calendar-check'],
+            ['label' => 'Komponen Gaji', 'route' => 'hr.payroll-components.index', 'icon' => 'credit-card'],
+            ['label' => 'Proses Gaji', 'route' => 'hr.payroll-runs.index', 'icon' => 'circle-dollar-sign'],
+        ],
     ];
 @endphp
 

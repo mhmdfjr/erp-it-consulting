@@ -3,7 +3,7 @@
 ## Sistem ERP - Perusahaan IT Service & Consulting
 
 Status: Draft v1.0
-Terakhir diperbarui: 2026-08-03 (revisi M2)
+Terakhir diperbarui: 2026-08-09 (revisi M3 planning)
 
 ---
 
@@ -91,15 +91,17 @@ Roadmap ini tidak menyertakan estimasi durasi kalender (minggu/bulan). Tim devel
 **Deliverables:**
 
 - Employee master data (termasuk field `ptkp_status` wajib), Department, Position.
-- Attendance tracking dasar.
+- Attendance tracking dasar (`present`/`absent`/`leave`/`sick`).
+- **Prorate base salary berbasis attendance (keputusan M3)**: dipicu cuma oleh `absent`, dihitung terhadap weekday dalam periode (libur nasional diabaikan di MVP). Tunjangan dibayar flat, tidak ikut prorate. Detail formula DATABASE.md Section 2.8a.
 - Payroll component configuration (earning/deduction) dan assignment ke employee.
-- BPJS rate configuration dan kalkulasi potongan.
-- PPh21 TER-only: seed data `ter_categories`, `ptkp_ter_mapping`, `ter_rates` dari Appendix A DATABASE.md, dan `PayrollService` yang lookup TER berdasarkan `ptkp_status` employee.
-- Payroll run per period, generate slip gaji, event `PayrollProcessed` terhubung ke Finance (mengisi listener skeleton dari M1).
+- BPJS rate configuration dan kalkulasi potongan, dari gross salary yang sudah termasuk prorate.
+- PPh21 TER-only: seed data `ter_categories`, `ptkp_ter_mapping`, `ter_rates` dari Appendix A DATABASE.md, dan `PayrollService` yang lookup TER berdasarkan `ptkp_status` employee. Hasil dibulatkan round half up ke rupiah penuh.
+- Payroll run per period, generate slip gaji, event `PayrollProcessed` (fire sekali per period, bukan per employee) terhubung ke Finance (mengisi listener skeleton dari M1) — menghasilkan **satu** journal entry agregat per period, accrual basis.
+- Aksi "Mark as Paid" per payroll run, toggle status jadi `paid` setelah net pay ditransfer ke karyawan (mirror pola Vendor Bill M1), tidak menghasilkan jurnal tambahan.
 
-**Exit criteria:** payroll run bisa diproses untuk satu periode, hasil potongan PPh21 tervalidasi manual terhadap kalkulator resmi DJP untuk minimal 3-5 skenario penghasilan berbeda (bukan cuma dites terhadap logic internal), dan journal entry beban gaji + utang BPJS + utang PPh21 muncul otomatis di Finance.
+**Exit criteria:** payroll run bisa diproses untuk satu periode dengan prorate attendance diterapkan dengan benar, hasil potongan PPh21 tervalidasi manual terhadap kalkulator resmi DJP untuk minimal 3-5 skenario penghasilan berbeda lintas kategori TER A/B/C (bukan cuma dites terhadap logic internal), journal entry agregat (beban gaji + beban BPJS perusahaan + utang gaji + utang PPh21 + utang BPJS gabungan employee-company) muncul otomatis di Finance dengan total debit = total credit, dan Mark as Paid mengubah status tanpa membuat jurnal baru.
 
-**Risk yang perlu dipantau:** ini satu-satunya bagian sistem yang salahnya berdampak legal/compliance (SPT karyawan), bukan cuma bug teknis biasa. Validasi terhadap sumber resmi bukan langkah opsional di exit criteria, itu syarat wajib sebelum milestone ini dianggap selesai.
+**Risk yang perlu dipantau:** ini satu-satunya bagian sistem yang salahnya berdampak legal/compliance (SPT karyawan), bukan cuma bug teknis biasa. Validasi terhadap sumber resmi bukan langkah opsional di exit criteria, itu syarat wajib sebelum milestone ini dianggap selesai. Tambahan risk M3: journal entry agregat per period berarti kesalahan sum di listener (misal lupa menambahkan company portion BPJS ke kredit 204/205, lihat DATABASE.md Appendix C) tidak akan terlihat lewat balance check biasa (`JournalEntryService` cuma menolak kalau total debit ≠ total credit, bukan menolak kalau alokasi ke akun individual salah) — sama seperti gotcha grouping per `item_type` di M2, kesalahan alokasi akun BPJS baru kelihatan saat laporan keuangan per-akun sudah salah.
 
 ## 7. M4 - Hardening, Dashboard, dan UAT
 

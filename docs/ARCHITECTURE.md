@@ -3,7 +3,7 @@
 ## Sistem ERP - Perusahaan IT Service & Consulting
 
 Status: Draft v1.0
-Terakhir diperbarui: 2026-08-09 (revisi M3 planning)
+Terakhir diperbarui: 2026-08-10 (revisi M3 selesai)
 
 ---
 
@@ -97,6 +97,8 @@ Setiap module folder itu self-contained: punya routes, views, migration, dan ser
 ## 3a. View Namespacing per Module
 
 Tiap `loadViewsFrom()` di ServiceProvider module WAJIB dikasih namespace unik (contoh: `loadViewsFrom(__DIR__.'/../resources/views', 'identity')`), dipanggil sebagai `view('identity::users.index')`. Tanpa namespace, view dengan nama file sama di module berbeda (misal semua module punya `index.blade.php`) akan collision di view resolver Laravel. Konvensi: namespace sama dengan nama module lowercase (`identity`, `finance`, `sales`, `hr`).
+
+**Catatan tambahan (ditemukan M3)**: Seeder module (`app/Modules/{Module}/database/seeders/`) berbeda karakter dari migration — migration di-load via path string (`loadMigrationsFrom()`, tidak butuh PSR-4), tapi Seeder adalah class PHP asli yang di-`use` lewat namespace, sehingga foldernya wajib persis cocok kapitalisasi dengan namespace-nya di Linux (case-sensitive filesystem). Kalau namespace ditulis StudlyCase (`App\Modules\HR\Database\Seeders`) tapi folder fisik lowercase (`database/seeders`, mengikuti konvensi migration di sebelahnya), Composer PSR-4 gagal resolve (`Target class ... does not exist`). Fix yang dipakai project ini: mapping eksplisit tambahan di `composer.json` (`"App\\Modules\\HR\\Database\\Seeders\\": "app/Modules/HR/database/seeders/"`) — folder tetap lowercase konsisten dengan migration, namespace tetap StudlyCase sesuai konvensi Laravel. Cek `composer.json` sebelum bikin seeder baru di module manapun yang belum punya mapping serupa.
 
 ## 3b. Factory Resolution untuk Model di `app/Modules/{Module}/Models`
 
@@ -255,6 +257,8 @@ Ini bukan bagian yang dibangun sekarang, hanya dicatat supaya keputusan "tidak a
 - **Unit test**: menyasar Service class langsung, tanpa HTTP layer. Contoh: test `PayrollService::calculatePph21()` dengan berbagai kombinasi PTKP status dan penghasilan bruto, verifikasi hasil sesuai tabel TER di DATABASE.md Appendix A.
 - **Feature test**: menyasar flow lewat HTTP request (Controller sampai response), memverifikasi efek end-to-end termasuk domain event yang ter-fire (pakai `Event::fake()` untuk assert event dipicu, tanpa perlu listener benar-benar jalan di test yang sama).
 - Test khusus untuk kalkulasi finansial (PPh21, BPJS, journal entry balance) wajib punya test case dengan angka konkret yang hasilnya diverifikasi manual terhadap sumber resmi (kalkulator DJP untuk PPh21), bukan cuma dites terhadap logic internal yang bisa saja salah dari awal.
+
+**9a. Gotcha SQLite (test) vs PostgreSQL (production) untuk query tanggal (ditemukan M3)**: environment test default (`phpunit.xml`, `DB_CONNECTION=sqlite`, `:memory:`) dipilih untuk kecepatan eksekusi test, tapi SQLite tidak punya tipe `DATE` native — representasi internal tanggal bisa menyimpang dari string `YYYY-MM-DD` murni yang dipakai untuk query. Konsekuensi konkret: `whereIn('date_column', [...])` atau `where('date_column', '=', $tanggal)` (exact string match) bisa gagal match padahal datanya ada, sementara `whereDate('date_column', $tanggal)` bekerja konsisten di kedua database. Demikian juga `whereBetween('date_column', [$start, $end])` dengan `$end` dari `endOfMonth()` berpotensi exclude baris tepat di boundary tergantung timezone session — pola yang lebih robust adalah half-open range eksplisit (`>= awal`, `< awal_periode_berikutnya`). **Aturan wajib untuk seluruh module ke depan**: query tanggal spesifik selalu pakai `whereDate()`, query rentang tanggal selalu pakai half-open range, jangan `whereBetween`/`whereIn`/exact match literal terhadap kolom bertipe date/datetime.
 
 ## 10. Deployment Overview
 

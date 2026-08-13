@@ -163,32 +163,16 @@ class PayrollRunEndToEndTest extends TestCase
 
         $this->fillFullAttendance($employee, 2026, 8);
 
-        // Override 3 hari yang tadinya 'present' jadi 'absent'
-        Attendance::where('employee_id', $employee->id)
-            ->whereIn('date', ['2026-08-03', '2026-08-04', '2026-08-05'])
-            ->update(['status' => 'absent']);
-
-        // === DEBUG SEMENTARA ===
-        $absentCountDirect = Attendance::where('employee_id', $employee->id)
-            ->where('status', 'absent')
-            ->count();
-        dump("Jumlah row status=absent langsung setelah update: {$absentCountDirect}");
-
-        $allStatuses = Attendance::where('employee_id', $employee->id)
-            ->orderBy('date')
-            ->pluck('status', 'date');
-        dump('Semua status per tanggal: ', $allStatuses->toArray());
-        // === AKHIR DEBUG ===
+        foreach (['2026-08-03', '2026-08-04', '2026-08-05'] as $date) {
+            Attendance::where('employee_id', $employee->id)
+                ->whereDate('date', $date)
+                ->update(['status' => 'absent']);
+        }
 
         $period = PayrollPeriod::factory()->create([
             'period_month' => 8,
             'period_year' => 2026,
         ]);
-
-        $prorateDebug = $this->service->calculateProratedBaseSalary($employee, $period);
-        dump('Hasil calculateProratedBaseSalary langsung: ', $prorateDebug);
-
-        $this->service->processPayrollRun($period);
 
         $this->service->processPayrollRun($period);
 
@@ -205,9 +189,6 @@ class PayrollRunEndToEndTest extends TestCase
 
         $debit511 = $entry->lines->firstWhere('account.code', '511');
 
-        // gross_salary di journal entry harus mencerminkan base yang
-        // SUDAH prorated (gross_salary = base_salary_prorated + earning),
-        // bukan base_salary kontraktual penuh.
         $this->assertEqualsWithDelta((float) $run->gross_salary, (float) $debit511->debit, 0.01);
         $this->assertLessThan(10000000, (float) $run->gross_salary);
     }
@@ -241,5 +222,140 @@ class PayrollRunEndToEndTest extends TestCase
             ->get();
 
         $this->assertCount(1, $entries, 'Panggilan kedua tidak boleh membuat journal entry tambahan.');
+    }
+
+    /**
+     * Attendance TIDAK lengkap (cuma 18 dari 21 hari kerja terisi) -> harus
+     * throw RuntimeException, TIDAK ada payroll_run yang terbuat sama sekali
+     * (bukan partial), TIDAK ada journal entry.
+     */
+    public function test_process_payroll_throws_when_attendance_incomplete(): void
+    {
+        $employee = Employee::factory()->create(['base_salary' => 10000000]);
+
+        // Cuma isi 18 dari 21 hari kerja Agustus 2026 (sengaja kurang 3)
+        $workingDays = $this->service->calculateWorkingDays(2026, 8);
+        $cursor = Carbon::create(2026, 8, 1);
+        $filled = 0;
+
+        while ($filled < $workingDays - 3) {
+            if (! $cursor->isWeekend()) {
+                Attendance::factory()->create([
+                    'employee_id' => $employee->id,
+                    'date' => $cursor->toDateString(),
+                    'status' => 'present',
+                ]);
+                $filled++;
+            }
+            $cursor->addDay();
+        }
+
+        $period = PayrollPeriod::factory()->create([
+            'period_month' => 8,
+            'period_year' => 2026,
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/Attendance belum lengkap/');
+
+        $this->service->processPayrollRun($period);
+
+        // Baris di bawah ini TIDAK akan pernah dieksekusi kalau exception
+        // benar-benar dilempar (PHPUnit stop di titik exception), tapi
+        // ditulis eksplisit sebagai dokumentasi ekspektasi: kalau ada yang
+        // mengubah behavior jadi "partial process lalu throw", test ini
+        // WAJIB direvisi, bukan diam-diam lolos.
+    }
+
+    /**
+     * Assert eksplisit TIDAK ada efek samping tersisa setelah exception —
+     * dipisah dari test di atas karena assertion setelah expectException()
+     * tidak pernah tereksekusi (PHPUnit stop di titik exception dilempar).
+     */
+    public function test_process_payroll_creates_no_side_effects_when_attendance_incomplete(): void
+    {
+        $employee = Employee::factory()->create(['base_salary' => 10000000]);
+
+        $workingDays = $this->service->calculateWorkingDays(2026, 8);
+        $cursor = Carbon::create(2026, 8, 1);
+        $filled = 0;
+
+        while ($filled < $workingDays - 3) {
+            if (! $cursor->isWeekend()) {
+                Attendance::factory()->create([
+                    'employee_id' => $employee->id,
+                    'date' => $cursor->toDateString(),
+                    'status' => 'present',
+                ]);
+                $filled++;
+            }
+            $cursor->addDay();
+        }
+
+        $period = PayrollPeriod::factory()->create([
+            'period_month' => 8,
+            'period_year' => 2026,
+        ]);
+
+        try {
+            $this->service->processPayrollRun($period);
+            $this->fail('processPayrollRun() seharusnya throw RuntimeException, tapi tidak.');
+        } catch (\RuntimeException $e) {
+            // expected
+        }
+
+        $this->assertSame(0, $period->payrollRuns()->count());
+        $this->assertSame('draft', $period->fresh()->status);
+
+        $entries = JournalEntry::where('reference_type', 'PayrollPeriod')
+            ->where('reference_id', $period->id)
+            ->count();
+        $this->assertSame(0, $entries);
+    }
+
+    /**
+     * forceIncomplete=true -> proses tetap jalan meski attendance kurang.
+     * Hari yang tidak punya record dianggap 'present' (TIDAK menambah
+     * absent_days), sesuai keputusan M3 planning.
+     */
+    public function test_process_payroll_with_force_incomplete_treats_missing_days_as_present(): void
+    {
+        $employee = Employee::factory()->create(['base_salary' => 10000000]);
+
+        // Cuma isi 18 dari 21 hari kerja, TIDAK ada satupun yang absent
+        // secara eksplisit — cuma kurang lengkap datanya.
+        $workingDays = $this->service->calculateWorkingDays(2026, 8);
+        $cursor = Carbon::create(2026, 8, 1);
+        $filled = 0;
+
+        while ($filled < $workingDays - 3) {
+            if (! $cursor->isWeekend()) {
+                Attendance::factory()->create([
+                    'employee_id' => $employee->id,
+                    'date' => $cursor->toDateString(),
+                    'status' => 'present',
+                ]);
+                $filled++;
+            }
+            $cursor->addDay();
+        }
+
+        $period = PayrollPeriod::factory()->create([
+            'period_month' => 8,
+            'period_year' => 2026,
+        ]);
+
+        $result = $this->service->processPayrollRun($period, forceIncomplete: true);
+
+        $this->assertSame(1, $result['processed']);
+        $this->assertEmpty($result['failed']);
+
+        $run = $period->payrollRuns()->first();
+
+        // KRITIS: hari kosong dianggap PRESENT, bukan absent. absent_days
+        // harus 0 (bukan 3), karena tidak ada satupun row berstatus 'absent'
+        // secara eksplisit — cuma data yang tidak lengkap.
+        $this->assertSame(0, $run->absent_days);
+        $this->assertEqualsWithDelta(10000000.0, (float) $run->base_salary, 0.01);
     }
 }

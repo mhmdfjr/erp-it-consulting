@@ -3,7 +3,7 @@
 ## Sistem ERP - Perusahaan IT Service & Consulting
 
 Status: Draft v1.0
-Terakhir diperbarui: 2026-08-09 (revisi M3 planning)
+Terakhir diperbarui: 2026-08-10 (revisi M3 selesai)
 
 ---
 
@@ -26,7 +26,7 @@ Roadmap ini tidak menyertakan estimasi durasi kalender (minggu/bulan). Tim devel
 | M0        | Project Setup + Identity & Access Management | Wajib duluan, seluruh module lain bergantung ke sini                                                                                                                                                                                                                  |
 | M1        | Finance Core (CoA + Journal Entry Engine)    | Wajib sebelum M2/M3, karena keduanya butuh consumer event ini sudah nyata                                                                                                                                                                                             |
 | M2        | Sales & Inventory                            | Dikerjakan sesudah M1. Secara arsitektur M2 dan M3 tidak saling bergantung, jadi urutannya bisa ditukar (M3 dulu baru M2) tanpa masalah teknis, tapi karena kamu kerja sendirian, kerjakan satu-satu sampai selesai, jangan mondar-mandir antara dua module sekaligus |
-| M3        | HR & Payroll (termasuk PPh21 TER-only)       | Sama seperti M2, tidak saling bergantung, urutan relatif terhadap M2 fleksibel                                                                                                                                                                                        |
+| M3        | HR & Payroll (termasuk PPh21 TER-only)       | **Selesai** (2026-08-10). Sama seperti M2, tidak saling bergantung, urutan relatif terhadap M2 fleksibel                                                                                                                                                              |
 | M4        | Hardening, Dashboard, dan UAT                | Wajib setelah M2 dan M3 selesai, butuh keduanya untuk testing lintas module yang berarti                                                                                                                                                                              |
 
 ---
@@ -100,6 +100,8 @@ Roadmap ini tidak menyertakan estimasi durasi kalender (minggu/bulan). Tim devel
 - Aksi "Mark as Paid" per payroll run, toggle status jadi `paid` setelah net pay ditransfer ke karyawan (mirror pola Vendor Bill M1), tidak menghasilkan jurnal tambahan.
 
 **Exit criteria:** payroll run bisa diproses untuk satu periode dengan prorate attendance diterapkan dengan benar, hasil potongan PPh21 tervalidasi manual terhadap kalkulator resmi DJP untuk minimal 3-5 skenario penghasilan berbeda lintas kategori TER A/B/C (bukan cuma dites terhadap logic internal), journal entry agregat (beban gaji + beban BPJS perusahaan + utang gaji + utang PPh21 + utang BPJS gabungan employee-company) muncul otomatis di Finance dengan total debit = total credit, dan Mark as Paid mengubah status tanpa membuat jurnal baru.
+
+**Status: Selesai (2026-08-10).** Seluruh exit criteria terverifikasi: full test suite 83/83 pass (214 assertion), PPh21 5/5 skenario cocok kalkulator resmi DJP, journal entry agregat balance dengan alokasi akun benar, Mark as Paid terverifikasi tanpa jurnal tambahan, verifikasi manual UI end-to-end lewat browser dikonfirmasi. Detail lengkap di `SESSION_SUMMARY_M3.md`.
 
 **Risk yang perlu dipantau:** ini satu-satunya bagian sistem yang salahnya berdampak legal/compliance (SPT karyawan), bukan cuma bug teknis biasa. Validasi terhadap sumber resmi bukan langkah opsional di exit criteria, itu syarat wajib sebelum milestone ini dianggap selesai. Tambahan risk M3: journal entry agregat per period berarti kesalahan sum di listener (misal lupa menambahkan company portion BPJS ke kredit 204/205, lihat DATABASE.md Appendix C) tidak akan terlihat lewat balance check biasa (`JournalEntryService` cuma menolak kalau total debit ≠ total credit, bukan menolak kalau alokasi ke akun individual salah) — sama seperti gotcha grouping per `item_type` di M2, kesalahan alokasi akun BPJS baru kelihatan saat laporan keuangan per-akun sudah salah.
 

@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Tambah Item</x-slot>
+    <x-slot name="header">Tambah Barang & Jasa</x-slot>
 
     <form method="POST" action="{{ route('sales.items.store') }}" x-data="{ itemType: 'physical_good' }" class="max-w-xl space-y-4">
         @csrf

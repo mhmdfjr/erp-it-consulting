@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Buat Payroll Period</x-slot>
+    <x-slot name="header">Buat Periode Gaji</x-slot>
 
     <form method="POST" action="{{ route('hr.payroll-runs.store') }}" class="max-w-md space-y-4">
         @csrf

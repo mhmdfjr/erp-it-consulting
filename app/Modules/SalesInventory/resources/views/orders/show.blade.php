@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Sales Order {{ $order->order_number }}</x-slot>
+    <x-slot name="header">Pesanan {{ $order->order_number }}</x-slot>
 
     <div class="flex items-center justify-between mb-4">
         <x-badge status="{{

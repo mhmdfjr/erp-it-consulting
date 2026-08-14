@@ -1,10 +1,10 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h1 class="text-heading font-medium text-ink-black">Department</h1>
+            <h1 class="text-heading font-medium text-ink-black">Manajemen Departemen</h1>
             @can('hr.department.manage')
                 <x-button variant="primary" href="{{ route('hr.departments.create') }}">
-                    + Tambah Department
+                    + Tambah Departemen
                 </x-button>
             @endcan
         </div>
@@ -15,7 +15,7 @@
             <div class="flex flex-col items-center gap-2">
                 <p class="text-heading-sm">Belum ada department</p>
                 <p class="text-body-sm text-slate-gray">Tambahkan department pertama sebelum membuat position.</p>
-                <x-button variant="primary" href="{{ route('hr.departments.create') }}">+ Tambah Department</x-button>
+                <x-button variant="primary" href="{{ route('hr.departments.create') }}">+ Tambah Departemen</x-button>
             </div>
         </x-slot>
 

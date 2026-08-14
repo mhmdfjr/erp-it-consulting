@@ -123,4 +123,8 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    // Kredensial super admin. Bisa diakses via env() atau config('app.super_admin_email') / config('app.super_admin_password').
+    'super_admin_email' => env('SUPER_ADMIN_EMAIL', 'superadmin@test.local'),
+    'super_admin_password' => env('SUPER_ADMIN_PASSWORD', 'password'),
+
 ];

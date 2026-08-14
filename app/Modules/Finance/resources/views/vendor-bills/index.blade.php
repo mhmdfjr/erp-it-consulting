@@ -1,11 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h1 class="text-heading font-medium text-ink-black">Vendor Bills</h1>
+            <h1 class="text-heading font-medium text-ink-black">Daftar Tagihan Vendor</h1>
 
             @can('finance.vendorbill.create')
                 <x-button href="{{ route('finance.vendor-bills.create') }}" variant="primary">
-                    + Buat Vendor Bill
+                    + Buat Tagihan Vendor
                 </x-button>
             @endcan
         </div>
@@ -30,7 +30,7 @@
 
                 @can('finance.vendorbill.create')
                     <x-button href="{{ route('finance.vendor-bills.create') }}" variant="primary">
-                        + Buat Vendor Bill
+                        + Buat Tagihan Vendor
                     </x-button>
                 @endcan
             </div>

@@ -1,10 +1,10 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h1 class="text-heading font-medium text-ink-black">Position</h1>
+            <h1 class="text-heading font-medium text-ink-black">Manajemen Jabatan</h1>
             @can('hr.position.manage')
                 <x-button variant="primary" href="{{ route('hr.positions.create') }}">
-                    + Tambah Position
+                    + Tambah Jabatan
                 </x-button>
             @endcan
         </div>
@@ -14,8 +14,8 @@
         <x-slot name="emptyState">
             <div class="flex flex-col items-center gap-2">
                 <p class="text-heading-sm">Belum ada position</p>
-                <p class="text-body-sm text-slate-gray">Tambahkan position pertama untuk department yang sudah ada.</p>
-                <x-button variant="primary" href="{{ route('hr.positions.create') }}">+ Tambah Position</x-button>
+                <p class="text-body-sm text-slate-gray">Tambahkan jabatan pertama untuk departemen yang sudah ada.</p>
+                <x-button variant="primary" href="{{ route('hr.positions.create') }}">+ Tambah Jabatan</x-button>
             </div>
         </x-slot>
 

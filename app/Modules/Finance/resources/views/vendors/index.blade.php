@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h1 class="text-heading font-medium text-ink-black">Vendors</h1>
+            <h1 class="text-heading font-medium text-ink-black">Daftar Vendor</h1>
 
             @can('finance.vendor.manage')
                 <x-button href="{{ route('finance.vendors.create') }}" variant="primary">

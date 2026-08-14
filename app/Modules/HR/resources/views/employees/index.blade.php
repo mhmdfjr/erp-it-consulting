@@ -1,10 +1,10 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h1 class="text-heading font-medium text-ink-black">Employee</h1>
+            <h1 class="text-heading font-medium text-ink-black">Manajemen Karyawan</h1>
             @can('hr.employee.create')
                 <x-button variant="primary" href="{{ route('hr.employees.create') }}">
-                    + Tambah Employee
+                    + Tambah Karyawan
                 </x-button>
             @endcan
         </div>
@@ -13,9 +13,9 @@
     <x-data-table :headers="['Kode', 'Nama', 'Position', 'PTKP', 'Status', 'Aksi']" :empty="$employees->isEmpty()">
         <x-slot name="emptyState">
             <div class="flex flex-col items-center gap-2">
-                <p class="text-heading-sm">Belum ada employee</p>
-                <p class="text-body-sm text-slate-gray">Tambahkan employee pertama untuk mulai kelola payroll.</p>
-                <x-button variant="primary" href="{{ route('hr.employees.create') }}">+ Tambah Employee</x-button>
+                <p class="text-heading-sm">Belum ada karyawan</p>
+                <p class="text-body-sm text-slate-gray">Tambahkan karyawan pertama untuk mulai kelola gaji.</p>
+                <x-button variant="primary" href="{{ route('hr.employees.create') }}">+ Tambah Karyawan</x-button>
             </div>
         </x-slot>
 

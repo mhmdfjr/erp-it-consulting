@@ -1,4 +1,4 @@
 <x-app-layout>
-    <x-slot name="header">Buat Sales Order</x-slot>
+    <x-slot name="header">Buat Pesananan</x-slot>
     <livewire:sales-order.create-order />
 </x-app-layout>

@@ -1,11 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h1 class="text-heading font-medium text-ink-black">Journal Entries</h1>
+            <h1 class="text-heading font-medium text-ink-black">Daftar Entri Journal</h1>
 
             @can('finance.journal.create')
                 <x-button href="{{ route('finance.journal-entries.create') }}" variant="primary">
-                    + Buat Journal Entry
+                    + Buat Entri Jurnal
                 </x-button>
             @endcan
         </div>

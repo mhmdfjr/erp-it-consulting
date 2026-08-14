@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Tambah Department</x-slot>
+    <x-slot name="header">Tambah Departemen</x-slot>
 
     <form method="POST" action="{{ route('hr.departments.store') }}" class="max-w-xl space-y-4">
         @csrf

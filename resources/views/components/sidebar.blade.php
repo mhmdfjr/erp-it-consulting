@@ -1,37 +1,37 @@
 @php
    $navGroups = [
-        'Utama' => [
+        'Main' => [
             ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'layout-dashboard'],
         ],
 
         'Super Admin' => [
             ['label' => 'User', 'route' => 'identity.users.index', 'icon' => 'users'],
             ['label' => 'Role & Permission', 'route' => 'identity.roles.index', 'icon' => 'shield-check'],
-            ['label' => 'Profil Perusahaan', 'route' => 'identity.company-profile.edit', 'icon' => 'building-2'],
-            ['label' => 'Pengaturan Sistem', 'route' => 'identity.settings.index', 'icon' => 'settings'],
+            ['label' => 'Company Profile', 'route' => 'identity.company-profile.edit', 'icon' => 'building-2'],
+            ['label' => 'System Setting', 'route' => 'identity.settings.index', 'icon' => 'settings'],
         ],
 
         'Finance' => [
-            ['label' => 'CoA', 'route' => 'finance.coa.index', 'icon' => 'landmark'],
-            ['label' => 'Entri Jurnal', 'route' => 'finance.journal-entries.index', 'icon' => 'book-open-text'],
+            ['label' => 'Chart of Accounts', 'route' => 'finance.coa.index', 'icon' => 'landmark'],
+            ['label' => 'Journal Entry', 'route' => 'finance.journal-entries.index', 'icon' => 'book-open-text'],
             ['label' => 'Vendor', 'route' => 'finance.vendors.index', 'icon' => 'truck'],
-            ['label' => 'Tagihan Vendor', 'route' => 'finance.vendor-bills.index', 'icon' => 'receipt'],
+            ['label' => 'Vendor Bill', 'route' => 'finance.vendor-bills.index', 'icon' => 'receipt'],
             ['label' => 'Invoice', 'route' => 'finance.invoices.index', 'icon' => 'file-text'],
         ],
 
         'Sales' => [
-            ['label' => 'Barang dan Jasa', 'route' => 'sales.items.index', 'icon' => 'package'],
-            ['label' => 'Pelanggan', 'route' => 'sales.customers.index', 'icon' => 'contact-round'],
-            ['label' => 'Pesanan Penjualan', 'route' => 'sales.orders.index', 'icon' => 'shopping-cart'],
+            ['label' => 'Product & Service', 'route' => 'sales.items.index', 'icon' => 'package'],
+            ['label' => 'Customer', 'route' => 'sales.customers.index', 'icon' => 'contact-round'],
+            ['label' => 'Sales Order', 'route' => 'sales.orders.index', 'icon' => 'shopping-cart'],
         ],
 
         'HR & Payroll' => [
-            ['label' => 'Departemen', 'route' => 'hr.departments.index', 'icon' => 'blocks'],
-            ['label' => 'Jabatan', 'route' => 'hr.positions.index', 'icon' => 'briefcase'],
-            ['label' => 'Karyawan', 'route' => 'hr.employees.index', 'icon' => 'user-shield'],
-            ['label' => 'Absensi', 'route' => 'hr.attendances.index', 'icon' => 'calendar-check'],
-            ['label' => 'Komponen Gaji', 'route' => 'hr.payroll-components.index', 'icon' => 'credit-card'],
-            ['label' => 'Proses Gaji', 'route' => 'hr.payroll-runs.index', 'icon' => 'circle-dollar-sign'],
+            ['label' => 'Department', 'route' => 'hr.departments.index', 'icon' => 'blocks'],
+            ['label' => 'Position', 'route' => 'hr.positions.index', 'icon' => 'briefcase'],
+            ['label' => 'Employee', 'route' => 'hr.employees.index', 'icon' => 'user-shield'],
+            ['label' => 'Attendance', 'route' => 'hr.attendances.index', 'icon' => 'calendar-check'],
+            ['label' => 'Payroll Component', 'route' => 'hr.payroll-components.index', 'icon' => 'credit-card'],
+            ['label' => 'Payroll Process', 'route' => 'hr.payroll-runs.index', 'icon' => 'circle-dollar-sign'],
         ],
     ];
 @endphp

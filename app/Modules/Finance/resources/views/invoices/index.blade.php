@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Invoice</x-slot>
+    <x-slot name="header">Daftar Faktur</x-slot>
 
     <x-data-table :headers="['No. Invoice', 'Customer', 'Jatuh Tempo', 'Status', 'Jumlah']" :empty="$invoices->isEmpty()">
         <x-slot name="emptyState">

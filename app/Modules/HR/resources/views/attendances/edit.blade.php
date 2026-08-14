@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Edit Attendance</x-slot>
+    <x-slot name="header">Edit Kehadiran</x-slot>
 
     <form method="POST" action="{{ route('hr.attendances.update', $attendance) }}" class="max-w-xl space-y-4">
         @csrf

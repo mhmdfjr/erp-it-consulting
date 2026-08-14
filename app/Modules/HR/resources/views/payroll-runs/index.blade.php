@@ -1,10 +1,10 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h1 class="text-heading font-medium text-ink-black">Payroll Run</h1>
+            <h1 class="text-heading font-medium text-ink-black">Proses Gaji</h1>
             @can('hr.payroll.process')
                 <x-button variant="primary" href="{{ route('hr.payroll-runs.create') }}">
-                    + Buat Payroll Period
+                    + Buat Periode Gaji
                 </x-button>
             @endcan
         </div>
@@ -13,9 +13,9 @@
     <x-data-table :headers="['Periode', 'Jumlah Employee Diproses', 'Status', 'Aksi']" :empty="$periods->isEmpty()">
         <x-slot name="emptyState">
             <div class="flex flex-col items-center gap-2">
-                <p class="text-heading-sm">Belum ada payroll period</p>
-                <p class="text-body-sm text-slate-gray">Buat periode pertama untuk mulai proses payroll.</p>
-                <x-button variant="primary" href="{{ route('hr.payroll-runs.create') }}">+ Buat Payroll Period</x-button>
+                <p class="text-heading-sm">Belum ada periode gaji</p>
+                <p class="text-body-sm text-slate-gray">Buat periode pertama untuk mulai proses gaji.</p>
+                <x-button variant="primary" href="{{ route('hr.payroll-runs.create') }}">+ Buat Periode Gaji</x-button>
             </div>
         </x-slot>
 

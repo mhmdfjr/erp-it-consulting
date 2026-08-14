@@ -8,7 +8,7 @@
                         Kelola Kategori
                     </x-button>
                     <x-button variant="primary" href="{{ route('sales.items.create') }}">
-                        + Tambah Item
+                        + Tambah Barang & Jasa
                     </x-button>
                 </div>
             @endcan

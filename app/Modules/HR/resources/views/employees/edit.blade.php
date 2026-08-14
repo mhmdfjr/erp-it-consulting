@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Edit Employee</x-slot>
+    <x-slot name="header">Edit Karyawan</x-slot>
 
     <form method="POST" action="{{ route('hr.employees.update', $employee) }}" class="max-w-xl space-y-4">
         @csrf
@@ -82,7 +82,7 @@
         <div class="flex gap-2">
             <x-button type="submit" variant="primary">Simpan</x-button>
             <x-button variant="danger" href="{{ route('hr.employees.index') }}">Batal</x-button>
-            <x-button variant="secondary" href="{{ route('hr.employees.payroll-components.index', $employee) }}">Kelola Payroll Komponen</x-button>
+            <x-button variant="secondary" href="{{ route('hr.employees.payroll-components.index', $employee) }}">Kelola Komponen Gaji</x-button>
         </div>
     </form>
 </x-app-layout>

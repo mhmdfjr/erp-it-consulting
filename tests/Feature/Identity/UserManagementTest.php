@@ -16,7 +16,6 @@ class UserManagementTest extends TestCase
     protected function seedPermissions(): void
     {
         foreach ([
-            'identity.manage',
             'identity.user.view',
             'identity.user.create',
             'identity.user.update',

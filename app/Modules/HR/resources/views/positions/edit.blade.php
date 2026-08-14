@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Edit Position</x-slot>
+    <x-slot name="header">Edit Jabatan</x-slot>
 
     <form method="POST" action="{{ route('hr.positions.update', $position) }}" class="max-w-xl space-y-4">
         @csrf

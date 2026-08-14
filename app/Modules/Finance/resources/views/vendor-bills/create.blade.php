@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header"><h1 class="text-heading font-medium text-ink-black">Buat Vendor Bill</h1></x-slot>
+    <x-slot name="header"><h1 class="text-heading font-medium text-ink-black">Buat Tagihan Vendor</h1></x-slot>
 
     <form method="POST" action="{{ route('finance.vendor-bills.store') }}" class="bg-paper-white border border-border-gray rounded-card shadow-subtle p-6 max-w-xl">
         @csrf

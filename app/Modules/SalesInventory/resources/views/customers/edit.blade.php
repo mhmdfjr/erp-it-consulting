@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Edit Customer</x-slot>
+    <x-slot name="header">Edit Pelanggan</x-slot>
 
     <form method="POST" action="{{ route('sales.customers.update', $customer) }}"
         x-data="{ customerType: '{{ old('customer_type', $customer->customer_type) }}' }" class="max-w-xl space-y-4">

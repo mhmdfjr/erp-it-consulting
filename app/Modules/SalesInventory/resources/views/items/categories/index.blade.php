@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Kategori Item</x-slot>
+    <x-slot name="header">Kategori Barang & Jasa</x-slot>
 
     <form method="POST" action="{{ route('sales.categories.store') }}" class="flex gap-2 mb-6 max-w-2xl">
         @csrf

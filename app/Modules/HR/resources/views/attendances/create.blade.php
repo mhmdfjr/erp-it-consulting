@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Catat Attendance</x-slot>
+    <x-slot name="header">Catat Kehadiran</x-slot>
 
     <form method="POST" action="{{ route('hr.attendances.store') }}" class="max-w-xl space-y-4">
         @csrf

@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Edit Payroll Component</x-slot>
+    <x-slot name="header">Edit Komponen Gaji</x-slot>
 
     <form method="POST" action="{{ route('hr.payroll-components.update', $payrollComponent) }}" class="max-w-xl space-y-4">
         @csrf

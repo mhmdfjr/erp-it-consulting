@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="flex items-center justify-between">
             <h1 class="text-heading font-medium text-ink-black">
-                Payroll - {{ \Carbon\Carbon::create($period->period_year, $period->period_month, 1)->translatedFormat('F Y') }}
+                Gaji - {{ \Carbon\Carbon::create($period->period_year, $period->period_month, 1)->translatedFormat('F Y') }}
             </h1>
             <x-badge status="{{ match($period->status) {
                 'draft' => 'info',

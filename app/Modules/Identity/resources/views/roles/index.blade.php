@@ -1,9 +1,9 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h1 class="text-heading font-medium text-ink-black">Role & Permission</h1>
+            <h1 class="text-heading font-medium text-ink-black">Manajemen Peran & Perizinan</h1>
             @can('create', \Spatie\Permission\Models\Role::class)
-                <x-button href="{{ route('identity.roles.create') }}" variant="primary">+ Tambah Role</x-button>
+                <x-button href="{{ route('identity.roles.create') }}" variant="primary">+ Tambah Peran & Perizinan</x-button>
             @endcan
         </div>
     </x-slot>

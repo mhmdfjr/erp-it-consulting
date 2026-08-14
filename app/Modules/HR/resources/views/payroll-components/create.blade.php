@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Tambah Payroll Component</x-slot>
+    <x-slot name="header">Tambah Komponen Gaji</x-slot>
 
     <form method="POST" action="{{ route('hr.payroll-components.store') }}" class="max-w-xl space-y-4">
         @csrf

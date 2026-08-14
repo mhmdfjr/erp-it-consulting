@@ -2,19 +2,22 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class RolePermissionSeeder extends Seeder
 {
     /**
-     * Daftar permission dasar per module.
+     * Daftar permission dasar per module. Granular saja, tidak ada lagi placeholder
+     * kasar ({module}.manage) — seluruh module M0-M3 sudah di-refine ke permission
+     * spesifik per resource, konsisten dengan SESSION_SUMMARY_M1/M2/M3.
      */
     protected array $permissions = [
-        'identity.manage',
+        // Identity
         'identity.user.view',
         'identity.user.create',
         'identity.user.update',
@@ -25,7 +28,7 @@ class RolePermissionSeeder extends Seeder
         'identity.role.delete',
         'identity.settings.manage',
 
-        'finance.manage',
+        // Finance
         'finance.coa.view',
         'finance.journal.view',
         'finance.journal.create',
@@ -38,10 +41,11 @@ class RolePermissionSeeder extends Seeder
         'finance.invoice.view',
         'finance.invoice.pay',
 
-        'sales.manage',
+        // Sales & Inventory
         'sales.item.view',
         'sales.item.create',
         'sales.item.update',
+        'sales.category.manage',
         'sales.customer.view',
         'sales.customer.create',
         'sales.customer.update',
@@ -51,9 +55,8 @@ class RolePermissionSeeder extends Seeder
         'sales.order.cancel',
         'sales.inventory.view',
         'sales.inventory.adjust',
-        'sales.category.create',
 
-        // HR & Payroll - placeholder, di-refine saat M3.
+        // HR & Payroll
         'hr.department.manage',
         'hr.position.manage',
         'hr.employee.view',
@@ -65,7 +68,7 @@ class RolePermissionSeeder extends Seeder
         'hr.payrollcomponent.manage',
         'hr.payroll.view',
         'hr.payroll.process',
-        'hr.payroll.pay'
+        'hr.payroll.pay',
     ];
 
     public function run(): void
@@ -78,5 +81,38 @@ class RolePermissionSeeder extends Seeder
 
         $superAdmin = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
         $superAdmin->syncPermissions(Permission::all());
+
+        $this->seedSuperAdminUser();
+    }
+
+    /**
+     * Bootstrap account wajib di setiap environment (dev, staging, production).
+     * Idempotent: kalau user sudah ada, password TIDAK ditimpa (misal sudah diganti
+     * manual oleh admin setelah login pertama), cuma role yang disinkronkan ulang.
+     */
+    private function seedSuperAdminUser(): void
+    {
+        $email = config('app.super_admin_email');
+        $password = config('app.super_admin_password');
+
+        $user = User::firstOrCreate(
+            ['email' => $email],
+            [
+                'name' => 'Super Admin',
+                'password' => Hash::make($password),
+                'is_active' => true,
+            ]
+        );
+
+        if (! $user->hasRole('Super Admin')) {
+            $user->assignRole('Super Admin');
+        }
+
+        if ($user->wasRecentlyCreated) {
+            $this->command->warn(
+                "Super Admin dibuat: {$email} / password dari config('app.super_admin_password')."
+                . ' Ganti password ini segera setelah login pertama di environment non-dev.'
+            );
+        }
     }
 }

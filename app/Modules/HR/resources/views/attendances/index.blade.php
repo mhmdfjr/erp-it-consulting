@@ -1,10 +1,10 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h1 class="text-heading font-medium text-ink-black">Attendance</h1>
+            <h1 class="text-heading font-medium text-ink-black">Kelola Kehadiran</h1>
             @can('hr.attendance.manage')
                 <x-button variant="primary" href="{{ route('hr.attendances.create') }}">
-                    + Catat Attendance
+                    + Catat Kehadiran
                 </x-button>
             @endcan
         </div>
@@ -12,7 +12,7 @@
 
     <form method="GET" class="flex gap-2 mb-4">
         <select name="employee_id" class="rounded-input border-border-gray" onchange="this.form.submit()">
-            <option value="">-- Semua Employee --</option>
+            <option value="">-- Semua Karyawan --</option>
             @foreach ($employees as $employee)
                 <option value="{{ $employee->id }}" {{ request('employee_id') == $employee->id ? 'selected' : '' }}>
                     {{ $employee->full_name }}
@@ -25,9 +25,9 @@
     <x-data-table :headers="['Tanggal', 'Employee', 'Check In', 'Check Out', 'Status', 'Aksi']" :empty="$attendances->isEmpty()">
         <x-slot name="emptyState">
             <div class="flex flex-col items-center gap-2">
-                <p class="text-heading-sm">Belum ada record attendance</p>
+                <p class="text-heading-sm">Belum ada catatan kehadiran</p>
                 <p class="text-body-sm text-slate-gray">Catat kehadiran pertama untuk mulai tracking.</p>
-                <x-button variant="primary" href="{{ route('hr.attendances.create') }}">+ Catat Attendance</x-button>
+                <x-button variant="primary" href="{{ route('hr.attendances.create') }}">+ Catat Kehadiran</x-button>
             </div>
         </x-slot>
 

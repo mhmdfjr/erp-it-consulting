@@ -7,6 +7,7 @@ use Illuminate\Database\Seeder;
 use \App\Modules\HR\database\seeders\TerRateSeeder;
 use \App\Modules\HR\database\seeders\BpjsRateSeeder;
 use \App\Modules\HR\database\seeders\PayrollComponentSeeder;
+use \App\Modules\Finance\database\seeders\ChartOfAccountsSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -19,6 +20,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             RolePermissionSeeder::class,
+            ChartOfAccountsSeeder::class,
             TerRateSeeder::class,
             BpjsRateSeeder::class,
             PayrollComponentSeeder::class,

@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h1 class="text-heading font-medium text-ink-black">Pengguna</h1>
+            <h1 class="text-heading font-medium text-ink-black">Manajemen Pengguna</h1>
             @can('create', \App\Models\User::class)
                 <x-button href="{{ route('identity.users.create') }}" variant="primary">+ Tambah Pengguna</x-button>
             @endcan

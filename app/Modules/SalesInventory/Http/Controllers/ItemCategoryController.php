@@ -10,7 +10,7 @@ class ItemCategoryController extends Controller
 {
     public function index()
     {
-        $this->authorize('sales.category.create', ItemCategory::class);
+        $this->authorize('sales.category.manage', ItemCategory::class);
 
         $categories = ItemCategory::withCount('items')->orderBy('name')->get();
 
@@ -19,7 +19,7 @@ class ItemCategoryController extends Controller
 
     public function store(Request $request)
     {
-        $this->authorize('sales.category.create', ItemCategory::class);
+        $this->authorize('sales.category.manage', ItemCategory::class);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:item_categories,name'],

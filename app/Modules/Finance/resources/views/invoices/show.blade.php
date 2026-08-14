@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Invoice {{ $invoice->invoice_number }}</x-slot>
+    <x-slot name="header">Faktur {{ $invoice->invoice_number }}</x-slot>
 
     <div class="flex items-center justify-between mb-4">
         <x-badge status="{{ $invoice->status === 'paid' ? 'success' : 'warning' }}">

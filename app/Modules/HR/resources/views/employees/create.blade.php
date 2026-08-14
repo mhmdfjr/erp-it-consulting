@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Tambah Employee</x-slot>
+    <x-slot name="header">Tambah Karyawan</x-slot>
 
     <form method="POST" action="{{ route('hr.employees.store') }}" class="max-w-2xl space-y-4">
         @csrf

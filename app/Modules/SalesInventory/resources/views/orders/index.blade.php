@@ -1,10 +1,10 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h1 class="text-heading font-medium text-ink-black">Pesanan Penjualan</h1>
+            <h1 class="text-heading font-medium text-ink-black">Riwayat Pesanan Penjualan</h1>
             @can('sales.order.create')
                 <x-button variant="primary" href="{{ route('sales.orders.create') }}">
-                    + Buat Sales Order
+                    + Buat Pesanan
                 </x-button>
             @endcan
         </div>

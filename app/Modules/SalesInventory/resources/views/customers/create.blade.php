@@ -1,5 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Tambah Customer</x-slot>
+    <x-slot name="header">Tambah Pelanggan</x-slot>
 
     <form method="POST" action="{{ route('sales.customers.store') }}"
         x-data="{ customerType: '{{ old('customer_type', 'individual') }}' }" class="max-w-xl space-y-4">

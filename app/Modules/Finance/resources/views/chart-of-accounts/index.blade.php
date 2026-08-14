@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <h1 class="text-heading font-medium text-ink-black">Chart of Accounts</h1>
+        <h1 class="text-heading font-medium text-ink-black">Daftar Bagan Akun</h1>
     </x-slot>
 
     <x-data-table

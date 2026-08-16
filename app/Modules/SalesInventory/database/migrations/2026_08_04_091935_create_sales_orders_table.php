@@ -22,6 +22,7 @@ return new class extends Migration
 
             $table->index('customer_id');
             $table->index('status');
+            $table->index('order_date');
         });
     }
 

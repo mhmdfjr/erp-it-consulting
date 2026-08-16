@@ -43,7 +43,7 @@ class DemoUserRoleSeeder extends Seeder
             ],
             'Finance Staff' => [
                 'finance.coa.view',
-                'finance.journal.view', 'finance.journal.create',
+                'finance.journal.view', 'finance.journal.create', 'finance.report.view',
                 'finance.vendor.view', 'finance.vendor.manage',
                 'finance.vendorbill.view', 'finance.vendorbill.create', 'finance.vendorbill.pay',
                 'finance.invoice.view', 'finance.invoice.pay',

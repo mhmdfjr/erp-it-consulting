@@ -5,6 +5,7 @@ use App\Modules\Finance\Http\Controllers\JournalEntryController;
 use App\Modules\Finance\Http\Controllers\VendorBillController;
 use App\Modules\Finance\Http\Controllers\VendorController;
 use App\Modules\Finance\Http\Controllers\InvoiceController;
+use App\Modules\Finance\Http\Controllers\FinancialReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'auth'])->prefix('finance')->name('finance.')->group(function () {
@@ -26,4 +27,7 @@ Route::middleware(['web', 'auth'])->prefix('finance')->name('finance.')->group(f
     Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
     Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
     Route::post('invoices/{invoice}/payments', [InvoiceController::class, 'storePayment'])->name('invoices.payments.store');
+
+    Route::get('reports/income-statement', [FinancialReportController::class, 'incomeStatement'])->name('reports.income-statement');
+    Route::get('reports/balance-sheet', [FinancialReportController::class, 'balanceSheet'])->name('reports.balance-sheet');
 });

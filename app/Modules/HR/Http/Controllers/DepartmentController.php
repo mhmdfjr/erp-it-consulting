@@ -11,6 +11,8 @@ class DepartmentController extends Controller
 {
     public function index()
     {
+        $this->authorize('hr.department.manage');
+
         $departments = Department::withCount('positions')->orderBy('name')->paginate(20);
 
         return view('hr::departments.index', compact('departments'));

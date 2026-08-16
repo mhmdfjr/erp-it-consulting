@@ -24,6 +24,7 @@ return new class extends Migration
             $table->timestampTz('created_at')->useCurrent();
 
             $table->index(['reference_type', 'reference_id']);
+            $table->index(['status', 'entry_date']);
         });
     }
 

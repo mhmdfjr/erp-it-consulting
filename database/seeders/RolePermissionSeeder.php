@@ -33,6 +33,7 @@ class RolePermissionSeeder extends Seeder
         'finance.journal.view',
         'finance.journal.create',
         'finance.journal.void',
+        'finance.report.view',
         'finance.vendor.view',
         'finance.vendor.manage',
         'finance.vendorbill.view',

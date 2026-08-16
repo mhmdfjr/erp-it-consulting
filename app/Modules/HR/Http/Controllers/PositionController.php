@@ -12,6 +12,8 @@ class PositionController extends Controller
 {
     public function index()
     {
+        $this->authorize('hr.position.manage');
+
         $positions = Position::with('department')->orderBy('title')->paginate(20);
 
         return view('hr::positions.index', compact('positions'));

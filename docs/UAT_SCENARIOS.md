@@ -20,15 +20,15 @@ Skenario ini dirancang bisa dijalankan berulang kali dari state data demo yang s
 
 Password seluruh user demo: `password`
 
-| Email | Role | Dipakai untuk skenario |
-|---|---|---|
-| `superadmin@test.local` | Super Admin | Semua module + Security |
-| `dewi.sales@test.local` / `rian.sales@test.local` | Sales Staff | Module Sales & Inventory |
-| `fajar.finance@test.local` / `nina.finance@test.local` | Finance Staff | Module Finance (tanpa void) |
-| `budi.financemanager@test.local` | Finance Manager | Module Finance (termasuk void) |
-| `sari.hr@test.local` / `agus.hr@test.local` | HR Staff | Module HR (tanpa proses payroll) |
-| `lina.hrmanager@test.local` | HR Manager | Module HR (termasuk proses payroll) |
-| `eko.resigned@test.local` | HR Staff, `is_active = false` | Security: user nonaktif tidak bisa login |
+| Email                                                  | Role                          | Dipakai untuk skenario                   |
+| ------------------------------------------------------ | ----------------------------- | ---------------------------------------- |
+| `superadmin@test.local`                                | Super Admin                   | Semua module + Security                  |
+| `dewi.sales@test.local` / `rian.sales@test.local`      | Sales Staff                   | Module Sales & Inventory                 |
+| `fajar.finance@test.local` / `nina.finance@test.local` | Finance Staff                 | Module Finance (tanpa void)              |
+| `budi.financemanager@test.local`                       | Finance Manager               | Module Finance (termasuk void)           |
+| `sari.hr@test.local` / `agus.hr@test.local`            | HR Staff                      | Module HR (tanpa proses payroll)         |
+| `lina.hrmanager@test.local`                            | HR Manager                    | Module HR (termasuk proses payroll)      |
+| `eko.resigned@test.local`                              | HR Staff, `is_active = false` | Security: user nonaktif tidak bisa login |
 
 ---
 
@@ -44,7 +44,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Seluruh data ter-render tanpa error, tidak ada 403.
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-ID-02 — User nonaktif tidak bisa masuk
 
@@ -55,7 +55,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Login ditolak atau user langsung di-redirect keluar (`is_active = false` harus dicek di flow auth). Kalau sistem **tidak** menolak, ini gap yang perlu dilaporkan — cek apakah guard `is_active` memang diimplementasikan di M0 atau cuma disimpan di kolom tanpa dipakai.
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-ID-03 — Role terbatas tidak bisa akses menu di luar scope
 
@@ -67,7 +67,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Kedua akses ditolak (403), menu Finance/HR juga tidak muncul di sidebar untuk role ini.
 
-- [ ] Lolos
+- [x] Lolos
 
 ---
 
@@ -84,7 +84,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Order tersimpan status `draft`, subtotal per baris dan total otomatis terhitung, tidak ada error dari `wire:key` dynamic row (SESSION_SUMMARY_M1 poin 3).
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-SI-02 — Item stok habis tidak muncul di dropdown
 
@@ -95,7 +95,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Item ini **tidak muncul** sebagai opsi (PRD.md Section 4.4 — item fisik stok habis tidak boleh jadi opsi).
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-SI-03 — Complete Order, verifikasi stok dan invoice sync
 
@@ -107,7 +107,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Invoice muncul sync tanpa jeda (DATABASE.md ASUMSI 7). Stok fisik berkurang, bukan cuma reserved.
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-SI-04 — Cancel Order melepas reservasi
 
@@ -120,7 +120,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Order berstatus `cancelled` dengan alasan tersimpan. Available stock kembali ke angka semula (reservasi dilepas, bukan nyangkut permanen — ini regresi test untuk bug M2 yang pernah nyata terjadi).
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-SI-05 — Cancel ditolak untuk order completed
 
@@ -131,7 +131,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Tombol Cancel **tidak muncul** untuk order berstatus `completed` (DATABASE.md ASUMSI 8 — cancel cuma valid dari `draft`).
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-SI-06 — Stock adjustment manual
 
@@ -142,7 +142,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Ditolak dengan pesan reason code wajib diisi (DATABASE.md Assumption 3). Isi reason code, submit ulang — berhasil, stok bertambah 5.
 
-- [ ] Lolos
+- [x] Lolos
 
 ---
 
@@ -162,7 +162,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Berhasil, `entry_number` format `JE-2026-xxxxxx` muncul.
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-FN-02 — Void Journal Entry butuh permission lebih tinggi
 
@@ -178,7 +178,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Berhasil, status berubah jadi `void`, `void_reason` tersimpan, nilai debit/credit baris tidak berubah (immutable, ARCHITECTURE.md Section 5b).
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-FN-03 — Record Payment dengan validasi anti-overpayment
 
@@ -193,7 +193,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Berhasil, invoice status berubah jadi `paid`, `paid_at` terisi, journal entry pelunasan muncul (debit 101/102 sesuai `payment_method`, kredit 103).
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-FN-04 — Vendor Bill accrual dan pelunasan
 
@@ -208,7 +208,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Status jadi `paid`, journal entry kedua muncul (debit 201, kredit 101/102).
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-FN-05 — Laporan Laba Rugi dan Neraca
 
@@ -226,7 +226,7 @@ Password seluruh user demo: `password`
 
 **Expected**: **Tidak ada** peringatan "tidak balance" berwarna merah. Kalau muncul, ini bug nyata yang harus dilaporkan sebelum lanjut ke UAT lain — jangan diabaikan.
 
-- [ ] Lolos
+- [x] Lolos
 
 ---
 
@@ -241,7 +241,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Employee tersimpan, muncul di list dengan status `active`.
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-HR-02 — Attendance completeness warning
 
@@ -252,7 +252,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Muncul warning attendance belum lengkap, menyebutkan jumlah employee yang datanya kurang, dengan opsi eksplisit untuk tetap lanjut (bukan block keras, bukan auto-lanjut diam-diam).
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-HR-03 — Verifikasi prorate untuk employee dengan hari absent
 
@@ -263,7 +263,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Nilai di slip **lebih kecil** dari kontraktual, ada keterangan jumlah hari kerja dan hari absent yang jadi dasar prorate. Tunjangan (kalau ada) tetap ditampilkan flat, tidak ikut terpotong.
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-HR-04 — Mark as Paid tidak membuat jurnal tambahan
 
@@ -276,7 +276,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Status payroll run berubah jadi `paid`, **tidak ada** journal entry baru yang muncul (ARCHITECTURE.md Section 4 — Mark as Paid tidak generate jurnal tambahan, mirror pola Vendor Bill).
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-HR-05 — Journal entry payroll: alokasi BPJS employee+company
 
@@ -288,7 +288,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Nilai kredit 204 = employee portion + company portion. Kalau ternyata sama persis dengan total employee portion saja, itu bug alokasi yang harus dilaporkan (kelas bug yang eksplisit ditandai ARCHITECTURE.md sebagai risiko M3).
 
-- [ ] Lolos
+- [x] Lolos
 
 ---
 
@@ -308,7 +308,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Seluruh chart (Sales + Finance + HR) muncul sekaligus.
 
-- [ ] Lolos
+- [x] Lolos
 
 ### UAT-DB-02 — Stat Card stock rendah termasuk item stok nol
 
@@ -319,7 +319,7 @@ Password seluruh user demo: `password`
 
 **Expected**: Item ini muncul (bug sebelumnya membuat item stok 0 hilang dari daftar karena tidak pernah punya row `stock_levels` — sudah di-fix, ini regresi test).
 
-- [ ] Lolos
+- [x] Lolos
 
 ---
 
@@ -327,14 +327,14 @@ Password seluruh user demo: `password`
 
 Isi setelah seluruh skenario dijalankan:
 
-| Module | Total Skenario | Lolos | Gagal | Catatan |
-|---|---|---|---|---|
-| Identity | 3 | | | |
-| Sales & Inventory | 6 | | | |
-| Finance & Accounting | 5 | | | |
-| HR & Payroll | 5 | | | |
-| Dashboard | 2 | | | |
-| **Total** | **21** | | | |
+| Module               | Total Skenario | Lolos  | Gagal | Catatan |
+| -------------------- | -------------- | ------ | ----- | ------- |
+| Identity             | 3              | 3      |       |         |
+| Sales & Inventory    | 6              | 6      |       |         |
+| Finance & Accounting | 5              | 5      |       |         |
+| HR & Payroll         | 5              | 5      |       |         |
+| Dashboard            | 2              | 2      |       |         |
+| **Total**            | **21**         | **21** |       |         |
 
 Setiap kegagalan dicatat di sini, lalu diklasifikasikan sesuai TASKS.md task 4.16: **blocking** (harus di-fix sebelum go-live) atau **fase 2** (bisa ditunda). Jangan lanjut ke Go-Live Prep (task 4.17-4.20) kalau masih ada kegagalan blocking yang belum di-fix.
 

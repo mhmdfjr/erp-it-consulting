@@ -1,25 +1,28 @@
-@props(['name', 'label' => null, 'type' => 'text', 'error' => null])
+@props(['name', 'label' => null, 'type' => 'text', 'error' => null, 'placeholder' => null])
 
 @php
     $errorMessage = $error ?: (($errors ?? null)?->first($name));
 @endphp
 
-<div>
+<div class="w-full">
     @if ($label)
-        <label for="{{ $name }}" class="block text-label text-slate-gray mb-1">{{ $label }}</label>
+        <label for="{{ $name }}" class="block text-label font-medium text-slate-gray mb-1.5">{{ $label }}</label>
     @endif
 
     <input
         type="{{ $type }}"
         name="{{ $name }}"
         id="{{ $name }}"
+        placeholder="{{ $placeholder }}"
         {{ $attributes->merge([
-            'class' => 'w-full rounded-input border px-3 py-2 text-body text-ink-black placeholder-ash-gray focus:outline-none focus:shadow-focus-ring '
-                . ($errorMessage ? 'border-danger' : 'border-border-gray focus:border-ink-black'),
+            'class' => 'w-full rounded-input border bg-paper-white px-3.5 py-2.5 text-body text-ink-black placeholder-ash-gray transition-colors focus:outline-none focus:shadow-focus-ring '
+                . ($errorMessage
+                    ? 'border-danger focus:border-danger'
+                    : 'border-border-gray focus:border-primary')
         ]) }}
     />
 
     @if ($errorMessage)
-        <p class="mt-1 text-caption text-danger">{{ $errorMessage }}</p>
+        <p class="mt-1.5 text-caption font-medium text-danger">{{ $errorMessage }}</p>
     @endif
 </div>

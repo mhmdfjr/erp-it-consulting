@@ -1,3 +1,4 @@
+// tailwind.config.js
 import defaultTheme from 'tailwindcss/defaultTheme';
 import forms from '@tailwindcss/forms';
 
@@ -14,22 +15,39 @@ export default {
     theme: {
         extend: {
             colors: {
-                'ink-black': '#17191c',
+                // Color Hunt Palette
+                primary: {
+                    DEFAULT: '#8100d1',
+                    hover: '#6d00b0',
+                    tint: '#f6edfd',
+                },
+                secondary: {
+                    DEFAULT: '#b500b2',
+                    tint: '#fdf2fd',
+                },
+                accent: {
+                    pink: '#ff52a0',
+                    'pink-tint': '#fff0f6',
+                    peach: '#ffa47f',
+                    'peach-tint': '#fff2ec',
+                },
+                // Neutrals
+                'ink-black': '#15131b',
                 'paper-white': '#ffffff',
-                'mist-gray': '#f2f2f3',
-                'fog-white': '#fafafb',
-                'slate-gray': '#777b86',
-                'ash-gray': '#979799',
-                'border-gray': '#e5e5e7',
-                'blush-peach': '#fbe1d1',
-                'sienna-brown': '#5d2a1a',
-                success: { DEFAULT: '#1a7f4e', bg: '#e6f4ec' },
-                warning: { DEFAULT: '#b5750a', bg: '#fdf1de' },
-                danger: { DEFAULT: '#c0362c', bg: '#faeae8' },
-                info: { DEFAULT: '#2563a8', bg: '#e9f1fa' },
+                'mist-gray': '#f4f3f7',
+                'fog-white': '#faf9fc',
+                'slate-gray': '#6f6b7d',
+                'ash-gray': '#9e9aa8',
+                'border-gray': '#e7e5ed',
+
+                // Semantic Status
+                success: { DEFAULT: '#15803d', bg: '#ecfdf5' },
+                warning: { DEFAULT: '#b45309', bg: '#fffbeb' },
+                danger:  { DEFAULT: '#b91c1c', bg: '#fef2f2' },
+                info:    { DEFAULT: '#0284c7', bg: '#f0f9ff' },
             },
             fontFamily: {
-                sans: ['Inter', ...defaultTheme.fontFamily.sans],
+                sans: ['Inter', 'Sohne', ...defaultTheme.fontFamily.sans],
             },
             fontSize: {
                 caption: ['12px', { lineHeight: '1.4' }],
@@ -41,9 +59,6 @@ export default {
                 heading: ['22px', { lineHeight: '1.3' }],
                 'heading-lg': ['28px', { lineHeight: '1.25' }],
             },
-            spacing: {
-                18: '4.5rem',
-            },
             borderRadius: {
                 card: '12px',
                 input: '8px',
@@ -52,9 +67,9 @@ export default {
                 table: '8px',
             },
             boxShadow: {
-                subtle: '0 1px 2px rgba(23,25,28,0.06)',
-                elevated: '0 4px 12px rgba(23,25,28,0.10)',
-                'focus-ring': '0 0 0 3px rgba(37,99,168,0.25)',
+                subtle: '0 1px 2px rgba(21,19,27,0.05)',
+                elevated: '0 4px 14px rgba(129,0,209,0.08)',
+                'focus-ring': '0 0 0 3px rgba(129,0,209,0.20)',
             },
             width: {
                 sidebar: '240px',

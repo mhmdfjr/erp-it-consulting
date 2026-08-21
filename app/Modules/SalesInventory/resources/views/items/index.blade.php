@@ -75,9 +75,16 @@
                 {{-- Kategori --}}
                 <td class="px-6 py-4">
                     @if ($item->category)
-                        <span class="inline-flex items-center gap-1.5 text-caption font-semibold text-slate-gray bg-fog-white border border-border-gray/80 px-2.5 py-0.5 rounded-badge">
-                            {{ $item->category->name }}
-                        </span>
+                        @php
+                            $palette = ['primary', 'peach', 'info', 'success', 'warning'];
+                            $catId = $item->item_category_id ?? 0;
+                            $catColor = $palette[$catId % count($palette)];
+                        @endphp
+
+                        <x-badge :status="$catColor" variant="subtle" class="gap-1.5 font-medium">
+                            <x-dynamic-component component="lucide-tag" class="w-3 h-3 shrink-0" />
+                            <span>{{ $item->category->name }}</span>
+                        </x-badge>
                     @else
                         <span class="text-caption text-ash-gray">-</span>
                     @endif
@@ -86,8 +93,8 @@
                 {{-- Tipe Item --}}
                 <td class="px-6 py-4">
                     <x-badge
-                        :status="$item->item_type === 'physical_good' ? 'primary' : 'peach'"
-                        variant="subtle"
+                        :status="$item->item_type === 'physical_good' ? 'primary' : 'secondary'"
+                        variant="solid"
                     >
                         {{ $item->item_type === 'physical_good' ? 'Barang Fisik' : 'Jasa Layanan' }}
                     </x-badge>

@@ -65,8 +65,14 @@
 
                 {{-- Departemen Terkait --}}
                 <td class="px-6 py-4">
+                    @php
+                        $palette = ['primary', 'peach', 'info', 'success', 'warning'];
+                        $deptId = $position->department_id ?? 0;
+                        $statusColor = $position->department ? $palette[$deptId % count($palette)] : 'neutral';
+                    @endphp
+
                     <div class="flex items-center gap-2">
-                        <x-badge status="primary" variant="subtle" class="gap-1.5">
+                        <x-badge :status="$statusColor" variant="subtle" class="gap-1.5">
                             <x-dynamic-component component="lucide-building-2" class="w-3.5 h-3.5 shrink-0" />
                             <span>{{ $position->department?->name ?? 'Tanpa Departemen' }}</span>
                         </x-badge>

@@ -41,17 +41,18 @@
                         }
                     }
                 }"
-                x-init="if (darkMode) { document.documentElement.classList.add('dark'); }"
                 @click="toggleTheme()"
-                class="p-2 rounded-input hover:bg-mist-gray dark:hover:bg-paper-white/5 hover:text-primary transition text-slate-gray"
+                class="p-2 rounded-input hover:bg-mist-gray dark:hover:bg-paper-white/10 text-slate-gray hover:text-primary dark:hover:text-primary transition"
                 :title="darkMode ? 'Beralih ke Mode Terang' : 'Beralih ke Mode Gelap'"
             >
-                <template x-if="!darkMode">
+                <!-- Icon saat Mode Terang (klik untuk masuk mode gelap) -->
+                <span x-show="!darkMode">
                     <x-dynamic-component component="lucide-moon" class="w-4 h-4 text-ink-black" />
-                </template>
-                <template x-if="darkMode">
+                </span>
+                <!-- Icon saat Mode Gelap (klik untuk masuk mode terang) -->
+                <span x-show="darkMode" style="display: none;">
                     <x-dynamic-component component="lucide-sun" class="w-4 h-4 text-warning" />
-                </template>
+                </span>
             </button>
 
             <!-- Notification Dropdown -->

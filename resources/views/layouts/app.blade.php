@@ -7,13 +7,21 @@
 
     <title>{{ config('app.name', 'ERP') }}@isset($title) - {{ $title }}@endisset</title>
 
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,450,500,600" rel="stylesheet" />
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
-<body class="font-sans antialiased bg-mist-gray text-ink-black">
+<body class="font-sans antialiased bg-fog-white dark:bg-[#0b1437] text-ink-black dark:text-paper-white transition-colors duration-200">
     <div class="flex min-h-screen">
         <x-sidebar />
 

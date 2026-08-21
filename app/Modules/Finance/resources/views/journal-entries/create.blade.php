@@ -1,7 +1,9 @@
 <x-app-layout>
     <x-slot name="header">
-        <h1 class="text-heading font-medium text-ink-black">Buat Entri Jurnal Manual</h1>
+        Buat Entri Jurnal Manual
     </x-slot>
 
-    @livewire('finance.create-journal-entry')
+    <div class="max-w-full mx-auto">
+        @livewire('finance.create-journal-entry')
+    </div>
 </x-app-layout>

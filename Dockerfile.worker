@@ -1,0 +1,34 @@
+# syntax=docker/dockerfile:1
+
+# ============================================================
+# Image worker: PHP CLI murni, tanpa nginx/php-fpm/asset build.
+# Worker cuma proses job queued (CreateJournalEntryFromSalesOrder,
+# CreateJournalEntryFromPayroll), tidak pernah serve HTTP request,
+# jadi tidak perlu komponen web server sama sekali.
+# ============================================================
+FROM php:8.3-cli-alpine
+
+# bcmath WAJIB sama seperti image web -- listener yang diproses worker ini
+# (CreateJournalEntryFromPayroll khususnya) memanggil JournalEntryService
+# yang bergantung penuh pada bcadd/bcsub/bccomp.
+RUN apk add --no-cache \
+    postgresql-dev icu-dev oniguruma-dev libzip-dev zip unzip git \
+    && docker-php-ext-install pdo pdo_pgsql pgsql bcmath intl zip
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www/html
+COPY . .
+RUN composer install --no-dev --optimize-autoloader --no-interaction
+
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+# --tries=3: kalau listener gagal (misal Finance module down sementara),
+# retry 3x sebelum masuk failed_jobs, bukan hilang diam-diam.
+# --sleep=3: jeda antar polling kalau antrian kosong, hindari busy-loop
+# yang buang CPU sia-sia.
+# --timeout=90: batas waktu per job. PayrollProcessed listener query
+# banyak payroll_runs sekaligus untuk agregasi -- 90 detik cukup longgar
+# untuk volume employee wajar, sesuaikan naik kalau company punya
+# ratusan employee dan job mulai timeout di production nanti.
+CMD ["php", "artisan", "queue:work", "--tries=3", "--sleep=3", "--timeout=90"]

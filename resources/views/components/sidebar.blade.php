@@ -48,14 +48,14 @@
         ->filter(fn ($items) => $items->isNotEmpty());
 @endphp
 
-<aside class="w-sidebar shrink-0 bg-fog-white border-r border-border-gray flex flex-col justify-between h-screen sticky top-0">
+<aside class="w-sidebar shrink-0 bg-fog-white dark:bg-[#0b1437] border-r border-border-gray dark:border-border-gray/10 flex flex-col justify-between h-screen sticky top-0 transition-colors">
     <div>
         <!-- App Logo & Branding -->
-        <div class="h-topbar flex items-center px-6 border-b border-border-gray/70">
+        <div class="h-topbar flex items-center px-6 border-b border-border-gray/70 dark:border-border-gray/10">
             <div class="h-8 w-8 rounded-card bg-primary text-paper-white flex items-center justify-center shadow-subtle mr-2.5">
                 <x-dynamic-component component="lucide-layers" class="w-4 h-4 text-paper-white" />
             </div>
-            <span class="text-body font-bold tracking-tight text-ink-black">{{ config('app.name', 'ERP') }}</span>
+            <span class="text-body font-bold tracking-tight text-ink-black dark:text-paper-white">{{ config('app.name', 'ERP') }}</span>
         </div>
 
         <!-- Navigation Links -->
@@ -63,7 +63,7 @@
             @foreach ($visibleNavGroups as $groupLabel => $items)
                 <div>
                     <div class="px-3 mb-2">
-                        <span class="text-[11px] font-bold text-ash-gray uppercase tracking-wider">{{ $groupLabel }}</span>
+                        <span class="text-[11px] font-bold text-ash-gray dark:text-slate-gray uppercase tracking-wider">{{ $groupLabel }}</span>
                     </div>
                     <ul class="space-y-1">
                         @foreach ($items as $item)
@@ -75,14 +75,14 @@
                                 <a href="{{ $exists ? route($item['route']) : '#' }}"
                                    class="flex items-center gap-3 px-3.5 py-2.5 rounded-card text-body-sm font-medium transition-all duration-200
                                           {{ $isActive
-                                                ? 'bg-paper-white text-ink-black shadow-subtle'
-                                                : 'text-slate-gray hover:bg-mist-gray/60 hover:text-ink-black' }}">
+                                                ? 'bg-paper-white dark:bg-[#111c44] text-ink-black dark:text-paper-white shadow-subtle'
+                                                : 'text-slate-gray dark:text-slate-gray hover:bg-mist-gray/60 dark:hover:bg-paper-white/5 hover:text-ink-black dark:hover:text-paper-white' }}">
 
                                     <!-- Icon Container -->
                                     <span class="flex items-center justify-center w-7 h-7 rounded-input transition-colors
                                           {{ $isActive
                                                 ? 'bg-primary text-paper-white shadow-sm'
-                                                : 'bg-paper-white text-primary shadow-subtle' }}">
+                                                : 'bg-paper-white dark:bg-[#1a2255] text-primary shadow-subtle' }}">
                                         <x-dynamic-component :component="'lucide-' . $item['icon']" class="w-4 h-4" />
                                     </span>
 
@@ -97,7 +97,7 @@
     </div>
 
     <!-- Help / Documentation Card Widget -->
-    <div class="p-3.5 border-t border-border-gray/60">
+    <div class="p-3.5 border-t border-border-gray/60 dark:border-border-gray/10">
         <div class="rounded-card bg-gradient-to-br from-primary via-primary-hover to-secondary p-4 text-paper-white shadow-subtle relative overflow-hidden">
             <div class="relative z-10">
                 <div class="w-7 h-7 rounded-full bg-paper-white/20 flex items-center justify-center mb-2.5">
@@ -105,7 +105,7 @@
                 </div>
                 <h4 class="text-body-sm font-semibold leading-snug">Need help?</h4>
                 <p class="text-caption text-paper-white/80 mt-0.5 mb-3">Please check our docs</p>
-                <a href="#" class="block text-center w-full py-1.5 px-3 bg-paper-white text-ink-black rounded-input text-caption font-bold tracking-wider uppercase hover:bg-mist-gray transition">
+                <a href="#" class="block text-center w-full py-1.5 px-3 bg-paper-white dark:bg-[#111c44] text-ink-black dark:text-paper-white rounded-input text-caption font-bold tracking-wider uppercase hover:bg-mist-gray dark:hover:bg-[#1a2255] transition">
                     Documentation
                 </a>
             </div>

@@ -29,8 +29,8 @@
             <x-topbar />
 
             @if (isset($header))
-                <div class="bg-paper-white border-b border-border-gray px-6 py-4">
-                    <h1 class="text-heading font-medium text-ink-black">{{ $header }}</h1>
+                <div class="bg-paper-white dark:bg-[#111c44] border-b border-border-gray dark:border-border-gray/10 px-6 py-4 transition-colors duration-200">
+                    <h1 class="text-heading font-medium text-ink-black dark:text-paper-white transition-colors duration-200">{{ $header }}</h1>
                 </div>
             @endif
 

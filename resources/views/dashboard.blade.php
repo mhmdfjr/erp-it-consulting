@@ -1,7 +1,7 @@
 {{-- resources/views/dashboard.blade.php --}}
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="text-heading-sm font-semibold text-ink-black tracking-tight">Dashboard Overview</h2>
+        <h2 class="text-heading-sm font-semibold text-ink-black dark:text-paper-white tracking-tight">Dashboard Overview</h2>
     </x-slot>
 
     <div class="max-w-full mx-auto space-y-6">
@@ -44,12 +44,12 @@
                 >
                     @foreach ($lowStockItems as $item)
                         @php $available = $item->quantity_on_hand - $item->quantity_reserved; @endphp
-                        <tr class="hover:bg-mist-gray/40 transition-colors">
-                            <td class="px-6 py-4 text-caption font-semibold text-slate-gray">{{ $item->sku }}</td>
-                            <td class="px-6 py-4 text-body-sm font-medium text-ink-black">{{ $item->name }}</td>
-                            <td class="px-6 py-4 text-body-sm tabular-nums text-slate-gray">{{ number_format($item->quantity_on_hand, 0, ',', '.') }}</td>
-                            <td class="px-6 py-4 text-body-sm tabular-nums text-slate-gray">{{ number_format($item->quantity_reserved, 0, ',', '.') }}</td>
-                            <td class="px-6 py-4 text-body-sm tabular-nums font-bold text-ink-black">{{ number_format($available, 0, ',', '.') }}</td>
+                        <tr class="hover:bg-mist-gray/40 dark:hover:bg-paper-white/5 transition-colors">
+                            <td class="px-6 py-4 text-caption font-semibold text-slate-gray dark:text-ash-gray">{{ $item->sku }}</td>
+                            <td class="px-6 py-4 text-body-sm font-medium text-ink-black dark:text-paper-white">{{ $item->name }}</td>
+                            <td class="px-6 py-4 text-body-sm tabular-nums text-slate-gray dark:text-ash-gray">{{ number_format($item->quantity_on_hand, 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 text-body-sm tabular-nums text-slate-gray dark:text-ash-gray">{{ number_format($item->quantity_reserved, 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 text-body-sm tabular-nums font-bold text-ink-black dark:text-paper-white">{{ number_format($available, 0, ',', '.') }}</td>
                             <td class="px-6 py-4">
                                 <x-badge :status="$available <= 0 ? 'danger' : 'warning'" variant="solid">
                                     {{ $available <= 0 ? 'Habis' : 'Rendah' }}
@@ -65,75 +65,75 @@
         @if($charts['sales'] || $charts['finance'] || $charts['hr'])
             <div class="grid grid-cols-2 lg:grid-cols-8 gap-4">
                 @if($charts['sales'])
-                    <div class="bg-paper-white border border-border-gray/80 rounded-card p-5 shadow-subtle col-span-2 lg:col-span-4 flex flex-col justify-between">
+                    <div class="bg-paper-white dark:bg-[#111c44] border border-border-gray/80 dark:border-border-gray/10 rounded-card p-5 shadow-subtle col-span-2 lg:col-span-4 flex flex-col justify-between">
                         <div class="mb-4">
-                            <h3 class="text-body-sm font-bold text-ink-black tracking-tight">Tren Penjualan</h3>
-                            <p class="text-caption text-slate-gray mt-0.5">{{ $charts['sales']['monthly_trend']['current_year_label'] }} vs {{ $charts['sales']['monthly_trend']['previous_year_label'] }}</p>
+                            <h3 class="text-body-sm font-bold text-ink-black dark:text-paper-white tracking-tight">Tren Penjualan</h3>
+                            <p class="text-caption text-slate-gray dark:text-ash-gray mt-0.5">{{ $charts['sales']['monthly_trend']['current_year_label'] }} vs {{ $charts['sales']['monthly_trend']['previous_year_label'] }}</p>
                         </div>
                         <canvas id="chart-sales-trend" height="300"></canvas>
                     </div>
-                    <div class="bg-paper-white border border-border-gray/80 rounded-card p-5 shadow-subtle col-span-1 lg:col-span-2 flex flex-col justify-between">
+                    <div class="bg-paper-white dark:bg-[#111c44] border border-border-gray/80 dark:border-border-gray/10 rounded-card p-5 shadow-subtle col-span-1 lg:col-span-2 flex flex-col justify-between">
                         <div class="mb-4">
-                            <h3 class="text-body-sm font-bold text-ink-black tracking-tight">Produk &amp; Jasa Terlaris</h3>
-                            <p class="text-caption text-slate-gray mt-0.5">Berdasarkan volume transaksi</p>
+                            <h3 class="text-body-sm font-bold text-ink-black dark:text-paper-white tracking-tight">Produk &amp; Jasa Terlaris</h3>
+                            <p class="text-caption text-slate-gray dark:text-ash-gray mt-0.5">Berdasarkan volume transaksi</p>
                         </div>
                         <canvas id="chart-sales-items" height="150"></canvas>
                     </div>
-                    <div class="bg-paper-white border border-border-gray/80 rounded-card p-5 shadow-subtle col-span-1 lg:col-span-2 flex flex-col justify-between">
+                    <div class="bg-paper-white dark:bg-[#111c44] border border-border-gray/80 dark:border-border-gray/10 rounded-card p-5 shadow-subtle col-span-1 lg:col-span-2 flex flex-col justify-between">
                         <div class="mb-4">
-                            <h3 class="text-body-sm font-bold text-ink-black tracking-tight">Status Sales Order</h3>
-                            <p class="text-caption text-slate-gray mt-0.5">Distribusi pemenuhan order</p>
+                            <h3 class="text-body-sm font-bold text-ink-black dark:text-paper-white tracking-tight">Status Sales Order</h3>
+                            <p class="text-caption text-slate-gray dark:text-ash-gray mt-0.5">Distribusi pemenuhan order</p>
                         </div>
                         <canvas id="chart-sales-status" height="150"></canvas>
                     </div>
                 @endif
 
                 @if($charts['finance'])
-                    <div class="bg-paper-white border border-border-gray/80 rounded-card p-5 shadow-subtle col-span-1 lg:col-span-2 flex flex-col justify-between">
+                    <div class="bg-paper-white dark:bg-[#111c44] border border-border-gray/80 dark:border-border-gray/10 rounded-card p-5 shadow-subtle col-span-1 lg:col-span-2 flex flex-col justify-between">
                         <div class="mb-4">
-                            <h3 class="text-body-sm font-bold text-ink-black tracking-tight">Umur Piutang</h3>
-                            <p class="text-caption text-slate-gray mt-0.5">Invoice belum dibayar</p>
+                            <h3 class="text-body-sm font-bold text-ink-black dark:text-paper-white tracking-tight">Umur Piutang</h3>
+                            <p class="text-caption text-slate-gray dark:text-ash-gray mt-0.5">Invoice belum dibayar</p>
                         </div>
                         <canvas id="chart-finance-aging" height="150"></canvas>
                     </div>
-                    <div class="bg-paper-white border border-border-gray/80 rounded-card p-5 shadow-subtle col-span-1 lg:col-span-2 flex flex-col justify-between">
+                    <div class="bg-paper-white dark:bg-[#111c44] border border-border-gray/80 dark:border-border-gray/10 rounded-card p-5 shadow-subtle col-span-1 lg:col-span-2 flex flex-col justify-between">
                         <div class="mb-4">
-                            <h3 class="text-body-sm font-bold text-ink-black tracking-tight">Metode Pembayaran</h3>
-                            <p class="text-caption text-slate-gray mt-0.5">Channel penerimaan kas</p>
+                            <h3 class="text-body-sm font-bold text-ink-black dark:text-paper-white tracking-tight">Metode Pembayaran</h3>
+                            <p class="text-caption text-slate-gray dark:text-ash-gray mt-0.5">Channel penerimaan kas</p>
                         </div>
                         <canvas id="chart-finance-payment-method" height="150"></canvas>
                     </div>
-                    <div class="bg-paper-white border border-border-gray/80 rounded-card p-5 shadow-subtle col-span-2 lg:col-span-4 flex flex-col justify-between">
+                    <div class="bg-paper-white dark:bg-[#111c44] border border-border-gray/80 dark:border-border-gray/10 rounded-card p-5 shadow-subtle col-span-2 lg:col-span-4 flex flex-col justify-between">
                         <div class="mb-4">
-                            <h3 class="text-body-sm font-bold text-ink-black tracking-tight">Pendapatan vs Beban</h3>
-                            <p class="text-caption text-slate-gray mt-0.5">Kinerja operasional 6 bulan terakhir</p>
+                            <h3 class="text-body-sm font-bold text-ink-black dark:text-paper-white tracking-tight">Pendapatan vs Beban</h3>
+                            <p class="text-caption text-slate-gray dark:text-ash-gray mt-0.5">Kinerja operasional 6 bulan terakhir</p>
                         </div>
                         <canvas id="chart-finance-revexp" height="300"></canvas>
                     </div>
                 @endif
 
                 @if($charts['hr'])
-                    <div class="bg-paper-white border border-border-gray/80 rounded-card p-5 shadow-subtle col-span-2 lg:col-span-4 flex flex-col justify-between">
+                    <div class="bg-paper-white dark:bg-[#111c44] border border-border-gray/80 dark:border-border-gray/10 rounded-card p-5 shadow-subtle col-span-2 lg:col-span-4 flex flex-col justify-between">
                         <div class="mb-4">
-                            <h3 class="text-body-sm font-bold text-ink-black tracking-tight">Headcount per Department</h3>
-                            <p class="text-caption text-slate-gray mt-0.5">Distribusi divisi operasional</p>
+                            <h3 class="text-body-sm font-bold text-ink-black dark:text-paper-white tracking-tight">Headcount per Department</h3>
+                            <p class="text-caption text-slate-gray dark:text-ash-gray mt-0.5">Distribusi divisi operasional</p>
                         </div>
                         <canvas id="chart-hr-headcount" height="300"></canvas>
                     </div>
                     @if($charts['hr']['attendance_breakdown'])
-                        <div class="bg-paper-white border border-border-gray/80 rounded-card p-5 shadow-subtle col-span-1 lg:col-span-2 flex flex-col justify-between">
+                        <div class="bg-paper-white dark:bg-[#111c44] border border-border-gray/80 dark:border-border-gray/10 rounded-card p-5 shadow-subtle col-span-1 lg:col-span-2 flex flex-col justify-between">
                             <div class="mb-4">
-                                <h3 class="text-body-sm font-bold text-ink-black tracking-tight">Status Kehadiran</h3>
-                                <p class="text-caption text-slate-gray mt-0.5">{{ $charts['hr']['attendance_breakdown']['period_label'] }}</p>
+                                <h3 class="text-body-sm font-bold text-ink-black dark:text-paper-white tracking-tight">Status Kehadiran</h3>
+                                <p class="text-caption text-slate-gray dark:text-ash-gray mt-0.5">{{ $charts['hr']['attendance_breakdown']['period_label'] }}</p>
                             </div>
                             <canvas id="chart-hr-attendance" height="300"></canvas>
                         </div>
                     @endif
                     @if($charts['hr']['payroll_cost_breakdown'])
-                        <div class="bg-paper-white border border-border-gray/80 rounded-card p-5 shadow-subtle col-span-1 lg:col-span-2 flex flex-col justify-between">
+                        <div class="bg-paper-white dark:bg-[#111c44] border border-border-gray/80 dark:border-border-gray/10 rounded-card p-5 shadow-subtle col-span-1 lg:col-span-2 flex flex-col justify-between">
                             <div class="mb-4">
-                                <h3 class="text-body-sm font-bold text-ink-black tracking-tight">Komposisi Payroll</h3>
-                                <p class="text-caption text-slate-gray mt-0.5">{{ $charts['hr']['payroll_cost_breakdown']['period_label'] }}</p>
+                                <h3 class="text-body-sm font-bold text-ink-black dark:text-paper-white tracking-tight">Komposisi Payroll</h3>
+                                <p class="text-caption text-slate-gray dark:text-ash-gray mt-0.5">{{ $charts['hr']['payroll_cost_breakdown']['period_label'] }}</p>
                             </div>
                             <canvas id="chart-hr-payroll" height="150"></canvas>
                         </div>
@@ -147,6 +147,13 @@
     @if($charts['sales'] || $charts['finance'] || $charts['hr'])
     <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const isDark = document.documentElement.classList.contains('dark');
+        const textColor = isDark ? '#a3aed0' : '#6f6b7d';
+        const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : '#f4f3f7';
+
+        Chart.defaults.color = textColor;
+        Chart.defaults.font.family = 'Inter';
+
         // Color Hunt Palette: Primary (#8100d1), Secondary (#b500b2), Accent Pink (#ff52a0), Accent Peach (#ffa47f)
         const brandPalette = ['#8100d1', '#b500b2', '#ff52a0', '#ffa47f', '#6f6b7d', '#e7e5ed'];
 
@@ -173,7 +180,7 @@
                     {
                         label: 'Revenue {{ $charts['sales']['monthly_trend']['previous_year_label'] }}',
                         data: @json($charts['sales']['monthly_trend']['previous_year_values']),
-                        borderColor: '#6f6b7d',
+                        borderColor: textColor,
                         backgroundColor: 'transparent',
                         borderDash: [5, 5],
                         fill: false,
@@ -181,7 +188,7 @@
                         pointStyle: 'circle',
                         pointRadius: 3,
                         pointHoverRadius: 5,
-                        pointBackgroundColor: '#6f6b7d',
+                        pointBackgroundColor: textColor,
                         pointBorderColor: '#ffffff',
                         pointBorderWidth: 2,
                     },
@@ -190,11 +197,11 @@
             options: {
                 responsive: true,
                 plugins: {
-                    legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 12, font: { size: 11, family: 'Inter' } } }
+                    legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 12, color: textColor, font: { size: 11, family: 'Inter' } } }
                 },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: '#f4f3f7' } },
-                    x: { grid: { display: false } }
+                    y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor } },
+                    x: { grid: { display: false }, ticks: { color: textColor } }
                 },
             },
         });
@@ -206,7 +213,7 @@
                 datasets: [{ data: @json($charts['sales']['item_breakdown']['values']), backgroundColor: brandPalette }],
             },
             options: {
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, family: 'Inter' } } } }
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, color: textColor, font: { size: 10, family: 'Inter' } } } }
             }
         });
 
@@ -218,7 +225,7 @@
             },
             options: {
                 cutout: '70%',
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, family: 'Inter' } } } }
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, color: textColor, font: { size: 10, family: 'Inter' } } } }
             }
         });
         @endif
@@ -235,10 +242,10 @@
             },
             options: {
                 responsive: true,
-                plugins: { legend: { position: 'top', align: 'end', labels: { boxWidth: 12, font: { size: 11, family: 'Inter' } } } },
+                plugins: { legend: { position: 'top', align: 'end', labels: { boxWidth: 12, color: textColor, font: { size: 11, family: 'Inter' } } } },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: '#f4f3f7' } },
-                    x: { grid: { display: false } }
+                    y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor } },
+                    x: { grid: { display: false }, ticks: { color: textColor } }
                 }
             },
         });
@@ -251,7 +258,7 @@
             },
             options: {
                 cutout: '70%',
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, family: 'Inter' } } } }
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, color: textColor, font: { size: 10, family: 'Inter' } } } }
             }
         });
 
@@ -262,7 +269,7 @@
                 datasets: [{ data: @json($charts['finance']['payment_method_distribution']['values']), backgroundColor: brandPalette }],
             },
             options: {
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, family: 'Inter' } } } }
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, color: textColor, font: { size: 10, family: 'Inter' } } } }
             }
         });
         @endif
@@ -278,8 +285,8 @@
                 indexAxis: 'y',
                 plugins: { legend: { display: false } },
                 scales: {
-                    x: { beginAtZero: true, grid: { color: '#f4f3f7' } },
-                    y: { grid: { display: false } }
+                    x: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor } },
+                    y: { grid: { display: false }, ticks: { color: textColor } }
                 }
             },
         });
@@ -294,8 +301,8 @@
             options: {
                 plugins: { legend: { display: false } },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: '#f4f3f7' } },
-                    x: { grid: { display: false } }
+                    y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor } },
+                    x: { grid: { display: false }, ticks: { color: textColor } }
                 }
             },
         });
@@ -309,7 +316,7 @@
                 datasets: [{ data: @json($charts['hr']['payroll_cost_breakdown']['values']), backgroundColor: brandPalette }],
             },
             options: {
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, family: 'Inter' } } } }
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, color: textColor, font: { size: 10, family: 'Inter' } } } }
             }
         });
         @endif

@@ -33,6 +33,8 @@ class InvoiceController extends Controller
     // Status invoice jadi 'paid' setelah total payments >= amount, sekaligus entri jurnal agar balance
     public function storePayment(StorePaymentRequest $request, Invoice $invoice, JournalEntryService $journalEntryService)
     {
+        \Illuminate\Support\Facades\Log::info('MARKER_STOREPAYMENT_DIPANGGIL', ['invoice_id' => $invoice->id]);
+
         $this->authorize('finance.invoice.pay', $invoice);
 
         $data = $request->validated();

@@ -10,9 +10,8 @@ use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 /**
- * Seeder DEMO, bukan production. Membuat role tambahan (subset permission dari
- * RolePermissionSeeder) plus user contoh per role, untuk simulasi dan bahan
- * negative-test authorization di M4 task 4.7.
+ * Seeder DEMO, bukan production. Membuat role tambahan plus user contoh per role, untuk simulasi dan bahan
+ * negative-test authorization
  *
  * Prasyarat: RolePermissionSeeder sudah dijalankan lebih dulu (permission harus
  * sudah ada di database sebelum di-sync ke role baru di sini).
@@ -23,9 +22,42 @@ class DemoUserRoleSeeder extends Seeder
 {
     /**
      * Password default seluruh user demo. Sengaja sama untuk kemudahan testing manual,
-     * JANGAN dipakai di production.
+     * JANGAN dipakai di production. Super Admin TIDAK memakai konstanta ini -- password-nya
+     * datang dari config('app.super_admin_password') yang di-set eksplisit lewat env
+     * Railway, terpisah dari seluruh user demo di sini.
      */
     private const DEMO_PASSWORD = 'password';
+
+    /**
+     * Daftar permission PENUH per domain, dipisah dari $roleDefinitions supaya role
+     * staff/manager (subset) dan role Admin (union penuh) sama-sama bersumber dari
+     * satu daftar kebenaran. Kalau ada permission baru ditambahkan ke
+     * RolePermissionSeeder, cukup update array ini di satu tempat.
+     */
+    private const FINANCE_PERMISSIONS_FULL = [
+        'finance.coa.view',
+        'finance.journal.view', 'finance.journal.create', 'finance.journal.void',
+        'finance.report.view',
+        'finance.vendor.view', 'finance.vendor.manage',
+        'finance.vendorbill.view', 'finance.vendorbill.create', 'finance.vendorbill.pay',
+        'finance.invoice.view', 'finance.invoice.pay',
+    ];
+
+    private const SALES_PERMISSIONS_FULL = [
+        'sales.item.view', 'sales.item.create', 'sales.item.update',
+        'sales.category.manage',
+        'sales.customer.view', 'sales.customer.create', 'sales.customer.update',
+        'sales.order.view', 'sales.order.create', 'sales.order.complete', 'sales.order.cancel',
+        'sales.inventory.view', 'sales.inventory.adjust',
+    ];
+
+    private const HR_PERMISSIONS_FULL = [
+        'hr.department.manage', 'hr.position.manage',
+        'hr.employee.view', 'hr.employee.create', 'hr.employee.update',
+        'hr.attendance.view', 'hr.attendance.manage',
+        'hr.payrollcomponent.view', 'hr.payrollcomponent.manage',
+        'hr.payroll.view', 'hr.payroll.process', 'hr.payroll.pay',
+    ];
 
     public function run(): void
     {
@@ -71,6 +103,18 @@ class DemoUserRoleSeeder extends Seeder
             ]
         );
 
+        /**
+         * Admin = union PENUH permission HR + Finance + Sales, TIDAK termasuk
+         * identity.* apapun (user.*, role.*, settings.manage). Ini satu-satunya
+         * pembeda dari Super Admin -- Admin bisa operasikan seluruh module bisnis,
+         * tapi tidak bisa ubah user/role/permission/company profile/system setting.
+         */
+        $roleDefinitions['Admin'] = array_merge(
+            self::FINANCE_PERMISSIONS_FULL,
+            self::SALES_PERMISSIONS_FULL,
+            self::HR_PERMISSIONS_FULL,
+        );
+
         foreach ($roleDefinitions as $roleName => $permissionNames) {
             $existingPermissions = Permission::whereIn('name', $permissionNames)->get();
 
@@ -87,7 +131,7 @@ class DemoUserRoleSeeder extends Seeder
             $role->syncPermissions($existingPermissions);
         }
 
-        // User contoh per role, 2 user untuk role staff (variasi), 1 untuk role manager.
+        // User contoh per role, 2 user untuk role staff (variasi), 1 untuk role manager/admin.
         $userSeeds = [
             ['name' => 'Dewi Sales', 'email' => 'dewi.sales@test.local', 'role' => 'Sales Staff'],
             ['name' => 'Rian Sales', 'email' => 'rian.sales@test.local', 'role' => 'Sales Staff'],
@@ -98,6 +142,8 @@ class DemoUserRoleSeeder extends Seeder
             ['name' => 'Agus HR', 'email' => 'agus.hr@test.local', 'role' => 'HR Staff'],
             ['name' => 'Lina HR Manager', 'email' => 'lina.hrmanager@test.local', 'role' => 'HR Manager'],
             ['name' => 'Eko Resigned', 'email' => 'eko.resigned@test.local', 'role' => 'HR Staff', 'is_active' => false],
+            // Admin: akses penuh HR+Finance+Sales, tidak bisa sentuh Identity.
+            ['name' => 'Andi Admin', 'email' => 'andi.admin@test.local', 'role' => 'Admin'],
         ];
 
         foreach ($userSeeds as $seed) {

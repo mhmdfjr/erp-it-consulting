@@ -33,18 +33,22 @@ class InvoiceController extends Controller
     // Status invoice jadi 'paid' setelah total payments >= amount, sekaligus entri jurnal agar balance
     public function storePayment(StorePaymentRequest $request, Invoice $invoice, JournalEntryService $journalEntryService)
     {
-        \Illuminate\Support\Facades\Log::info('MARKER_STOREPAYMENT_DIPANGGIL', ['invoice_id' => $invoice->id]);
+        \Illuminate\Support\Facades\Log::info('MARKER_1_MASUK_METHOD', ['invoice_id' => $invoice->id]);
 
         $this->authorize('finance.invoice.pay', $invoice);
+        \Illuminate\Support\Facades\Log::info('MARKER_2_LOLOS_AUTHORIZE');
 
         $data = $request->validated();
+        \Illuminate\Support\Facades\Log::info('MARKER_3_LOLOS_VALIDASI', $data);
 
         DB::transaction(function () use ($invoice, $data, $journalEntryService) {
             $payment = $invoice->payments()->create($data);
+            \Illuminate\Support\Facades\Log::info('MARKER_4_PAYMENT_DIBUAT', ['payment_id' => $payment->id]);
 
             $cashAccountCode = $data['payment_method'] === 'cash' ? '101' : '102';
             $cashAccountId = ChartOfAccount::where('code', $cashAccountCode)->firstOrFail()->id;
             $receivableAccountId = ChartOfAccount::where('code', '103')->firstOrFail()->id;
+            \Illuminate\Support\Facades\Log::info('MARKER_5_AKUN_DITEMUKAN', ['cash' => $cashAccountId, 'receivable' => $receivableAccountId]);
 
             $journalEntryService->createEntry([
                 'entry_date' => $payment->payment_date,
@@ -67,14 +71,16 @@ class InvoiceController extends Controller
                     ],
                 ],
             ]);
+            \Illuminate\Support\Facades\Log::info('MARKER_6_JOURNAL_ENTRY_DIBUAT');
 
             $totalPaid = $invoice->payments()->sum('amount');
-
             if (bccomp((string) $totalPaid, (string) $invoice->amount, 2) >= 0) {
                 $invoice->update(['status' => 'paid', 'paid_at' => now()]);
             }
+            \Illuminate\Support\Facades\Log::info('MARKER_7_STATUS_DIUPDATE');
         });
 
+        \Illuminate\Support\Facades\Log::info('MARKER_8_TRANSACTION_SELESAI');
         return redirect()
             ->route('finance.invoices.show', $invoice)
             ->with('success', 'Pembayaran berhasil dicatat.');

@@ -6,7 +6,7 @@
 
 <div class="w-full">
     @if ($label)
-        <label for="{{ $name }}" class="block text-label font-medium text-slate-gray mb-1.5">{{ $label }}</label>
+        <label for="{{ $name }}" class="block text-label font-medium text-slate-gray dark:text-ash-gray mb-1.5">{{ $label }}</label>
     @endif
 
     <input
@@ -15,10 +15,10 @@
         id="{{ $name }}"
         placeholder="{{ $placeholder }}"
         {{ $attributes->merge([
-            'class' => 'w-full rounded-input border bg-paper-white px-3.5 py-2.5 text-body text-ink-black placeholder-ash-gray transition-colors focus:outline-none focus:shadow-focus-ring '
+            'class' => 'w-full rounded-input border bg-paper-white dark:bg-paper-white/5 px-3.5 py-2.5 text-body text-ink-black dark:text-paper-white placeholder-ash-gray dark:placeholder-slate-gray transition-colors focus:outline-none focus:shadow-focus-ring '
                 . ($errorMessage
                     ? 'border-danger focus:border-danger'
-                    : 'border-border-gray focus:border-primary')
+                    : 'border-border-gray dark:border-border-gray/20 focus:border-primary')
         ]) }}
     />
 

@@ -99,13 +99,17 @@
     <!-- Help / Documentation Card Widget -->
     <div class="p-3.5 border-t border-border-gray/60 dark:border-border-gray/10">
         <div class="rounded-card bg-gradient-to-br from-primary via-primary-hover to-secondary p-4 text-paper-white shadow-subtle relative overflow-hidden">
-            <div class="relative z-10">
-                <div class="w-7 h-7 rounded-full bg-paper-white/20 flex items-center justify-center mb-2.5">
-                    <x-dynamic-component component="lucide-help-circle" class="w-4 h-4 text-paper-white" />
+            <div class="relative z-10 space-y-4">
+                <div class="flex gap-2 items-center">
+                    <div class="w-7 h-7 rounded-full bg-paper-white/20 flex items-center justify-center">
+                        <x-dynamic-component component="lucide-help-circle" class="w-4 h-4 text-paper-white" />
+                    </div>
+                    <div>
+                        <h4 class="text-body-sm font-semibold leading-snug">Need help?</h4>
+                        <p class="text-caption text-paper-white/80">Please check our docs</p>
+                    </div>
                 </div>
-                <h4 class="text-body-sm font-semibold leading-snug">Need help?</h4>
-                <p class="text-caption text-paper-white/80 mt-0.5 mb-3">Please check our docs</p>
-                <a href="#" class="block text-center w-full py-1.5 px-3 bg-paper-white dark:bg-[#111c44] text-ink-black dark:text-paper-white rounded-input text-caption font-bold tracking-wider uppercase hover:bg-mist-gray dark:hover:bg-[#1a2255] transition">
+                <a href="{{ route('documentation') }}" class="block text-center w-full py-1.5 px-3 bg-paper-white dark:bg-[#111c44] text-ink-black dark:text-paper-white rounded-input text-caption font-bold tracking-wider uppercase hover:bg-mist-gray dark:hover:bg-[#1a2255] transition">
                     Documentation
                 </a>
             </div>

@@ -23,7 +23,7 @@
                     </div>
 
                     <p class="text-body-sm text-slate-gray dark:text-ash-gray leading-relaxed">
-                        Sistem ERP ini terintegrasi secara *real-time* lintas operasional bisnis mulai dari Penjualan, Keuangan, Inventaris, hingga SDM.
+                        Sistem ERP ini terintegrasi secara real-time lintas operasional bisnis mulai dari Penjualan, Keuangan, Inventaris, hingga SDM.
                     </p>
 
                     <div class="pt-4 border-t border-border-gray/60 dark:border-border-gray/10 space-y-4">

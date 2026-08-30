@@ -9,4 +9,5 @@ return [
      * kalau nanti perlu di-upgrade jadi kolom minimum_stock_level per item.
      */
     'low_stock_threshold' => env('LOW_STOCK_THRESHOLD', 5),
+    'payroll_reminder_day' => env('PAYROLL_REMINDER_DAY', 25),
 ];

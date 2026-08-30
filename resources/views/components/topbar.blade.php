@@ -45,105 +45,78 @@
                 class="p-2 rounded-input hover:bg-mist-gray dark:hover:bg-paper-white/10 text-slate-gray hover:text-primary dark:hover:text-primary transition"
                 :title="darkMode ? 'Beralih ke Mode Terang' : 'Beralih ke Mode Gelap'"
             >
-                <!-- Icon saat Mode Terang (klik untuk masuk mode gelap) -->
                 <span x-show="!darkMode">
                     <x-dynamic-component component="lucide-moon" class="w-4 h-4 text-ink-black" />
                 </span>
-                <!-- Icon saat Mode Gelap (klik untuk masuk mode terang) -->
                 <span x-show="darkMode" style="display: none;">
                     <x-dynamic-component component="lucide-sun" class="w-4 h-4 text-warning" />
                 </span>
             </button>
 
             <!-- Notification Dropdown -->
-            <div x-data="{ unreadCount: 3 }">
+            <div>
                 <x-dropdown align="right" width="80" content-classes="py-0 bg-paper-white dark:bg-[#111c44] border border-border-gray dark:border-border-gray/10 rounded-card shadow-elevated overflow-hidden w-80 sm:w-96">
                     <x-slot name="trigger">
-                        <button
-                            type="button"
-                            class="p-2 rounded-input hover:bg-mist-gray dark:hover:bg-paper-white/5 hover:text-primary transition relative"
-                            title="Notifikasi"
-                        >
+                        <button type="button" class="p-2 rounded-input hover:bg-mist-gray dark:hover:bg-paper-white/5 hover:text-primary transition relative" title="Notifikasi">
                             <x-dynamic-component component="lucide-bell" class="w-4 h-4" />
-                            <span
-                                x-show="unreadCount > 0"
-                                class="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full ring-2 ring-paper-white dark:ring-[#111c44]"
-                            ></span>
+                            @if($unreadPersistedCount > 0 || count($computedAlerts) > 0)
+                                <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full ring-2 ring-paper-white dark:ring-[#111c44]"></span>
+                            @endif
                         </button>
                     </x-slot>
 
                     <x-slot name="content">
-                        <!-- Header Notifikasi -->
                         <div class="px-4 py-3 border-b border-border-gray dark:border-border-gray/10 flex items-center justify-between bg-fog-white/60 dark:bg-paper-white/5">
                             <div class="flex items-center gap-2">
                                 <h4 class="text-body-sm font-bold text-ink-black dark:text-paper-white">Notifikasi</h4>
-                                <span
-                                    x-show="unreadCount > 0"
-                                    class="text-[10px] font-mono font-bold bg-primary-tint text-primary px-1.5 py-0.5 rounded-full"
-                                    x-text="unreadCount + ' Baru'"
-                                ></span>
+                                @if($unreadPersistedCount > 0)
+                                    <span class="text-[10px] font-mono font-bold bg-primary-tint text-primary px-1.5 py-0.5 rounded-full">
+                                        {{ $unreadPersistedCount }} Baru
+                                    </span>
+                                @endif
                             </div>
-                            <button
-                                type="button"
-                                @click="unreadCount = 0"
-                                class="text-caption font-semibold text-primary hover:underline"
-                            >
-                                Tandai semua dibaca
-                            </button>
+                            @if($unreadPersistedCount > 0)
+                                <form method="POST" action="{{ route('notifications.mark-all-read') }}">
+                                    @csrf
+                                    <button type="submit" class="text-caption font-semibold text-primary hover:underline">
+                                        Tandai semua dibaca
+                                    </button>
+                                </form>
+                            @endif
                         </div>
 
-                        <!-- List Notifikasi -->
                         <div class="divide-y divide-border-gray/50 dark:divide-border-gray/10 max-h-80 overflow-y-auto">
-                            <!-- Notifikasi 1: Sales Order -->
-                            <a href="{{ route('sales.orders.index') }}" class="p-3.5 flex items-start gap-3 hover:bg-mist-gray/40 dark:hover:bg-paper-white/5 transition">
-                                <div class="w-8 h-8 rounded-card bg-primary-tint text-primary flex items-center justify-center shrink-0 mt-0.5 shadow-subtle">
-                                    <x-dynamic-component component="lucide-shopping-cart" class="w-4 h-4" />
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <p class="text-body-sm font-semibold text-ink-black dark:text-paper-white truncate leading-tight">
-                                        Pesanan Baru Masuk
-                                    </p>
-                                    <p class="text-caption text-slate-gray mt-0.5 line-clamp-2">
-                                        Sales Order <strong>#SO-2026-004</strong> telah dibuat oleh PT Surya Gemilang.
-                                    </p>
-                                    <span class="text-[10px] text-ash-gray mt-1 block">10 menit yang lalu</span>
-                                </div>
-                            </a>
+                            @forelse($computedAlerts as $alert)
+                                <a href="{{ $alert['url'] }}" class="p-3.5 flex items-start gap-3 hover:bg-mist-gray/40 dark:hover:bg-paper-white/5 transition">
+                                    <div class="w-8 h-8 rounded-card bg-{{ $alert['color'] }}-bg text-{{ $alert['color'] }} flex items-center justify-center shrink-0 mt-0.5 shadow-subtle">
+                                        <x-dynamic-component :component="'lucide-' . $alert['icon']" class="w-4 h-4" />
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-body-sm font-semibold text-ink-black dark:text-paper-white truncate leading-tight">{{ $alert['title'] }}</p>
+                                        <p class="text-caption text-slate-gray mt-0.5 line-clamp-2">{{ $alert['message'] }}</p>
+                                    </div>
+                                </a>
+                            @empty
+                            @endforelse
 
-                            <!-- Notifikasi 2: Payroll HRD -->
-                            <a href="{{ route('hr.payroll-runs.index') }}" class="p-3.5 flex items-start gap-3 hover:bg-mist-gray/40 dark:hover:bg-paper-white/5 transition">
-                                <div class="w-8 h-8 rounded-card bg-success-bg text-success flex items-center justify-center shrink-0 mt-0.5 shadow-subtle">
-                                    <x-dynamic-component component="lucide-banknote" class="w-4 h-4" />
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <p class="text-body-sm font-semibold text-ink-black dark:text-paper-white truncate leading-tight">
-                                        Pengingat Siklus Gaji
-                                    </p>
-                                    <p class="text-caption text-slate-gray mt-0.5 line-clamp-2">
-                                        Batas akhir pemrosesan Payroll periode bulan ini tinggal 2 hari lagi.
-                                    </p>
-                                    <span class="text-[10px] text-ash-gray mt-1 block">2 jam yang lalu</span>
-                                </div>
-                            </a>
-
-                            <!-- Notifikasi 3: Peringatan Stok Gudang -->
-                            <a href="{{ route('sales.items.index') }}" class="p-3.5 flex items-start gap-3 hover:bg-mist-gray/40 dark:hover:bg-paper-white/5 transition">
-                                <div class="w-8 h-8 rounded-card bg-warning-bg text-warning flex items-center justify-center shrink-0 mt-0.5 shadow-subtle">
-                                    <x-dynamic-component component="lucide-boxes" class="w-4 h-4" />
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <p class="text-body-sm font-semibold text-ink-black dark:text-paper-white truncate leading-tight">
-                                        Peringatan Stok Menipis
-                                    </p>
-                                    <p class="text-caption text-slate-gray mt-0.5 line-clamp-2">
-                                        Item <strong>Kertas HVS A4 80gr</strong> tersisa 3 rim di gudang utama.
-                                    </p>
-                                    <span class="text-[10px] text-ash-gray mt-1 block">1 hari yang lalu</span>
-                                </div>
-                            </a>
+                            @forelse($persistedNotifications as $notification)
+                                <a href="{{ route('notifications.open', $notification) }}" class="p-3.5 flex items-start gap-3 hover:bg-mist-gray/40 dark:hover:bg-paper-white/5 transition">
+                                    <div class="w-8 h-8 rounded-card bg-{{ $notification->data['color'] }}-tint text-{{ $notification->data['color'] }} flex items-center justify-center shrink-0 mt-0.5 shadow-subtle">
+                                        <x-dynamic-component :component="'lucide-' . $notification->data['icon']" class="w-4 h-4" />
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-body-sm font-semibold text-ink-black dark:text-paper-white truncate leading-tight">{{ $notification->data['title'] }}</p>
+                                        <p class="text-caption text-slate-gray mt-0.5 line-clamp-2">{{ $notification->data['message'] }}</p>
+                                        <span class="text-[10px] text-ash-gray mt-1 block">{{ $notification->created_at->diffForHumans() }}</span>
+                                    </div>
+                                </a>
+                            @empty
+                                @if(count($computedAlerts) === 0)
+                                    <div class="p-6 text-center text-caption text-slate-gray">Tidak ada notifikasi.</div>
+                                @endif
+                            @endforelse
                         </div>
 
-                        <!-- Footer Notifikasi -->
                         <div class="p-2.5 border-t border-border-gray dark:border-border-gray/10 text-center bg-fog-white/30 dark:bg-paper-white/5">
                             <span class="text-[11px] text-slate-gray font-medium">Sistem Notifikasi Terpusat KelolaIn</span>
                         </div>
